@@ -1,0 +1,18 @@
+# Core
+torch>=2.1
+numpy>=1.24
+einops>=0.7          # convenient for token/patch reshaping (you may avoid it if you prefer raw reshape)
+
+# Data / IO
+pyyaml>=6.0          # config loading
+
+# Eval / analysis
+scikit-learn>=1.3    # k-NN, t-SNE, silhouette, cluster purity
+umap-learn>=0.5      # UMAP (optional; t-SNE works without it)
+matplotlib>=3.7      # figures
+
+# Logging / experiments (optional but recommended)
+# wandb>=0.16
+
+# Testing
+pytest>=7.4

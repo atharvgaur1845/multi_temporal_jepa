@@ -1,0 +1,44 @@
+# Temporal JEPA model + training config.
+objective: temporal_jepa           # one of: temporal_jepa | spatial_jepa | mae | byol | simclr
+
+encoder:
+  patch_size: 16                   # 128/16 = 8x8 = 64 tokens/frame  (P=8 -> 256 tokens is an ablation)
+  embed_dim: 256                   # ablation grid: {128, 256, 512, 768}
+  depth: 6                         # spatial ViT depth
+  num_heads: 8
+  temporal_depth: 4                # factorized temporal transformer depth
+
+predictor:
+  embed_dim: 384                   # FIXED narrow width — the I-JEPA asymmetry bottleneck (keep ~384)
+  depth: 6                         # ablation grid: {1, 2, 4, 6}
+  num_heads: 12
+
+ema:
+  base_momentum: 0.996
+  final_momentum: 1.0
+  schedule: linear                 # I-JEPA paper = linear ramp
+
+temporal:
+  horizon: 1                       # Δ in acquisition steps; horizon study sweeps {1, 2, 4, 8}
+  min_context: 4                   # minimum number of past acquisitions in the context
+
+loss:
+  type: l2                         # I-JEPA = L2; ablate L1 (V-JEPA)
+  target_layernorm: true           # LayerNorm targets before loss
+  stop_grad: true                  # MANDATORY on target branch
+
+optim:
+  name: adamw
+  lr: 1.0e-3
+  warmup_epochs: 15
+  min_lr: 1.0e-6
+  weight_decay_start: 0.04
+  weight_decay_end: 0.40
+  epochs: 100
+  batch_size: 64                   # effective batch via grad_accum on a single GPU
+  grad_accum: 4
+  amp: true
+
+log:
+  diagnostics_every: 50            # steps; ALWAYS pair loss with collapse diagnostics + a probe
+  seed: 0
