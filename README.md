@@ -51,8 +51,12 @@ per-frame PatchEmbed (Conv 10→D, P=16 → 8×8=64 tokens/frame) + 2D spatial p
                                   Loss = mean ‖ ẑ_future − sg(LayerNorm(z_future)) ‖²  ◄┘
 ```
 
-Three anti-collapse mechanisms work together: **EMA target** (lagging teacher), **stop-gradient**
-on the target, and the **narrow predictor** bottleneck (predictor width < encoder width).
+Anti-collapse mechanisms working together: **EMA target** (lagging teacher), **stop-gradient**
+on the target, the **narrow predictor** bottleneck (predictor width < encoder width), and —
+because temporal SITS makes *future ≈ present* and thus collapse very easy — a **VICReg-style
+variance–covariance regularizer** on the trainable context embedding (`loss.var_coeff` /
+`loss.cov_coeff`; set both to 0 for pure I-JEPA). Without the regularizer the M1 gate collapses
+on real PASTIS (loss→0, std→0.04); with it, std stays healthy.
 
 ---
 
@@ -212,8 +216,9 @@ tests/        unit tests (TDD); test_model_synthetic runs the full wiring withou
   simclr`); **`device:`** — the single GPU knob (`cuda` / `cuda:1` / `cuda:2` / `cpu`), overridable
   per-run with `--device`; encoder dims (default 512); **predictor 384** (must stay < encoder —
   `build_model` auto-clamps otherwise); EMA schedule; horizon Δ + min_context; loss (L2 + target
-  LayerNorm + stop-grad); optimizer (AdamW, warmup→cosine LR, cosine wd ramp, flip `augment`, AMP,
-  grad-accum).
+  LayerNorm + stop-grad, **`var_coeff`/`cov_coeff`** VICReg anti-collapse weights — default on,
+  set to 0 for pure I-JEPA); optimizer (AdamW, warmup→cosine LR, cosine wd ramp, flip `augment`,
+  AMP, grad-accum).
 
 **GPU / memory:** 512-dim encoder × ~40 frames × batch 64 is heavy. If you OOM: lower
 `optim.batch_size` and raise `optim.grad_accum` (effective batch unchanged), or drop
@@ -249,8 +254,10 @@ PASTIS_ROOT=/path/to/PASTIS pytest -q   # also runs test_dataset + test_probe_sa
   **not** the target encoder, EMA moves the target. (Runs without any download.)
 
 The **M1 correctness gate** is `scripts/overfit8_smoketest.py`: it must show loss dropping
-**while** per-dim std and effective rank stay high. Current synthetic run: loss `1.36 → 0.001`,
-std `~0.92`, effective rank `~7.3` → **PASS** for both objectives.
+**while** per-dim std and effective rank stay high (loss won't reach 0 with the variance
+regularizer on — that is expected and healthy). It catches real collapse: on PASTIS, *without*
+the VICReg term it fails (loss→0 but std→0.04, effrank→2.4); *with* it (default), std stays
+healthy. Pass `--var-coeff 0 --cov-coeff 0` to reproduce the collapsing baseline.
 
 ---
 

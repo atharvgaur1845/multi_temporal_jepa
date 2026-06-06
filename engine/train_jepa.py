@@ -21,7 +21,7 @@ from data.transforms import compute_band_stats
 from engine.diagnostics import collapse_metrics
 from engine.ema import ema_update, momentum_schedule
 from models.jepa import build_model
-from objectives.jepa_loss import jepa_latent_loss
+from objectives.jepa_loss import jepa_latent_loss, variance_covariance_reg
 from utils.checkpoint import save_checkpoint
 from utils.config import load_yaml
 from utils.device import resolve_device
@@ -95,6 +95,14 @@ def train_one_epoch(model, loader, optimizer, scaler, cfg, step0, total_steps, d
             pred, target, ctx = model(batch)
             loss = jepa_latent_loss(pred, target, norm_target=loss_cfg.get("target_layernorm", True),
                                     loss_type=loss_cfg.get("type", "l2"))
+            # VICReg-style anti-collapse on the trainable context embedding (essential for
+            # temporal SITS JEPA, where future ≈ present makes collapse easy). Set coeffs to 0
+            # in the config to recover pure I-JEPA.
+            var_c = loss_cfg.get("var_coeff", 1.0)
+            cov_c = loss_cfg.get("cov_coeff", 0.04)
+            if var_c or cov_c:
+                std_l, cov_l = variance_covariance_reg(ctx.float())
+                loss = loss + var_c * std_l + cov_c * cov_l
         scaler.scale(loss / grad_accum).backward()
 
         if (it + 1) % grad_accum == 0:

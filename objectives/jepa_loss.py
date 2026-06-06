@@ -14,6 +14,7 @@ This is the "JEPA thesis": predict in representation space. Two non-negotiable d
 """
 from __future__ import annotations
 
+import torch
 import torch.nn.functional as F
 
 
@@ -45,3 +46,28 @@ def jepa_latent_loss(pred, target, norm_target=True, loss_type="l2"):
         raise ValueError(f"unknown loss_type {loss_type!r}")
     # mean over feature dim -> tokens -> batch
     return per_elem.mean()
+
+
+def variance_covariance_reg(z, gamma=1.0, eps=1e-4):
+    """VICReg-style anti-collapse regularizer on a trainable embedding `z` (..., D).
+
+    Why this is needed for *temporal* SITS JEPA: consecutive acquisitions of the same field are
+    nearly identical, so "predict the future latent" is trivially solvable by collapsing the
+    encoder to a constant (loss -> 0, std -> 0). EMA + predictor + stop-grad alone don't prevent
+    this when the two views are so correlated. These two terms push back directly:
+
+      std_loss = mean_d relu(gamma - std_d)   # keep each dim's batch-std >= gamma (anti-collapse)
+      cov_loss = sum_{i != j} cov_ij^2 / D     # decorrelate dims (anti dimensional-collapse)
+
+    Returns (std_loss, cov_loss). Apply to the trainable context embedding (and optionally the
+    predictor output); the EMA target is detached and not regularized.
+    """
+    z = z.reshape(-1, z.shape[-1])
+    z = z - z.mean(dim=0, keepdim=True)
+    std = torch.sqrt(z.var(dim=0) + eps)
+    std_loss = torch.relu(gamma - std).mean()
+    n, d = z.shape
+    cov = (z.t() @ z) / max(1, n - 1)
+    off = cov - torch.diag(torch.diag(cov))
+    cov_loss = off.pow(2).sum() / d
+    return std_loss, cov_loss

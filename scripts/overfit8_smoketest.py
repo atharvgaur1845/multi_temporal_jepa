@@ -30,7 +30,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from engine.diagnostics import collapse_metrics  # noqa: E402
 from engine.ema import ema_update, momentum_schedule  # noqa: E402
 from models.jepa import JEPA  # noqa: E402
-from objectives.jepa_loss import jepa_latent_loss  # noqa: E402
+from objectives.jepa_loss import jepa_latent_loss, variance_covariance_reg  # noqa: E402
 
 
 def make_synthetic_batch(B=8, T=12, C=10, H=128, W=128, seed=0):
@@ -64,6 +64,8 @@ def main():
     ap.add_argument("--pastis", action="store_true")
     ap.add_argument("--std-floor", type=float, default=0.05)
     ap.add_argument("--rank-floor", type=float, default=2.0)
+    ap.add_argument("--var-coeff", type=float, default=1.0, help="VICReg variance term weight")
+    ap.add_argument("--cov-coeff", type=float, default=0.04, help="VICReg covariance term weight")
     ap.add_argument("--device", default=None, help="e.g. cuda:1 (default: auto)")
     args = ap.parse_args()
 
@@ -84,6 +86,8 @@ def main():
         model.train()
         pred, target, ctx = model(batch)
         loss = jepa_latent_loss(pred, target)
+        std_l, cov_l = variance_covariance_reg(ctx)
+        loss = loss + args.var_coeff * std_l + args.cov_coeff * cov_l
         opt.zero_grad(); loss.backward(); opt.step()
         m = momentum_schedule(step, args.steps)
         ema_update(model.context_encoder, model.target_encoder, m)

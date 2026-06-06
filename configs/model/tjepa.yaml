@@ -31,6 +31,10 @@ loss:
   type: l2                         # I-JEPA = L2; ablate L1 (V-JEPA)
   target_layernorm: true           # LayerNorm targets before loss
   stop_grad: true                  # MANDATORY on target branch
+  # VICReg-style anti-collapse on the trainable context embedding. Temporal SITS JEPA collapses
+  # easily (future ≈ present), so these are ON by default. Set both to 0.0 for pure I-JEPA.
+  var_coeff: 1.0                   # variance hinge: keep per-dim std >= 1
+  cov_coeff: 0.04                  # covariance: decorrelate embedding dims
 
 optim:
   name: adamw
