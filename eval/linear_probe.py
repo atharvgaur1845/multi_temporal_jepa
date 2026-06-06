@@ -60,8 +60,16 @@ def miou_from_confusion(conf, ignore_index=None):
     return iou[valid].mean().item(), iou
 
 
-def linear_probe_segmentation(encoder, train_loader, val_loader, num_classes=19,
-                              ignore_index=0, epochs=20, lr=1e-3, device=None,
+def _sanitize_labels(label, num_classes, ignore_index):
+    """Map any label outside [0, num_classes) to ignore_index. PASTIS void (19) and any stray
+    out-of-range value become 'ignore' instead of triggering a CUDA device-side assert in
+    cross_entropy (which would poison the CUDA context for the rest of the process)."""
+    return torch.where((label >= 0) & (label < num_classes), label,
+                       torch.full_like(label, ignore_index))
+
+
+def linear_probe_segmentation(encoder, train_loader, val_loader, num_classes=20,
+                              ignore_index=19, epochs=20, lr=1e-3, device=None,
                               use_temporal=True):
     """Freeze encoder; train a 1x1-conv head -> per-pixel logits; report mIoU.
 
@@ -88,7 +96,8 @@ def linear_probe_segmentation(encoder, train_loader, val_loader, num_classes=19,
             batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
             feat = extract_dense_features(encoder, batch, use_temporal=use_temporal)
             logits = head(feat)
-            loss = F.cross_entropy(logits, batch["label"], ignore_index=ignore_index)
+            label = _sanitize_labels(batch["label"], num_classes, ignore_index)
+            loss = F.cross_entropy(logits, label, ignore_index=ignore_index)
             opt.zero_grad(); loss.backward(); opt.step()
 
     head.eval()
@@ -98,6 +107,7 @@ def linear_probe_segmentation(encoder, train_loader, val_loader, num_classes=19,
             batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
             feat = extract_dense_features(encoder, batch, use_temporal=use_temporal)
             pred = head(feat).argmax(1).cpu()
-            conf += _confusion(pred, batch["label"].cpu(), num_classes, ignore_index)
+            label = _sanitize_labels(batch["label"].cpu(), num_classes, ignore_index)
+            conf += _confusion(pred, label, num_classes, ignore_index)
     miou, per_class = miou_from_confusion(conf, ignore_index)
     return {"miou": miou, "per_class_iou": per_class}

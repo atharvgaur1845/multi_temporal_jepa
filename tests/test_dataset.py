@@ -20,8 +20,11 @@ def test_sample_shapes():
     assert dates.shape == (data.shape[0],)
     assert dates.dtype == torch.long
     assert torch.all((dates >= 1) & (dates <= 366))
-    assert torch.all(dates[1:] >= dates[:-1]), "dates must be chronologically sorted"
+    # NOTE: dates are CALENDAR day-of-year, and PASTIS spans Sep-2018..Nov-2019, so DOY WRAPS
+    # at the year boundary (e.g. 350 -> 17). Acquisitions are chronological by index (which is
+    # what the temporal split uses); DOY is a periodic positional signal, not a sort key.
     assert label.shape == (128, 128) and label.dtype == torch.long
+    assert int(label.min()) >= 0 and int(label.max()) <= 19  # PASTIS: 0=bg, 1..18 crops, 19=void
 
 
 def test_collate_padding_mask():

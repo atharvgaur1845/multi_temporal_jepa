@@ -4,8 +4,8 @@ name: pastis
 root: ./data_root/PASTIS          # set after scripts/download_pastis.sh
 bands: 10                          # B2,B3,B4,B5,B6,B7,B8,B8A,B11,B12 (resampled to 10 m) — VERIFY ordering
 patch_size_px: 128
-num_classes: 19                    # 18 crops + background/void (index 0)
-ignore_index: 0                    # background/void — decide whether to exclude from mIoU
+num_classes: 20                    # PASTIS labels: 0=background, 1..18 crops, 19=void (20 values)
+ignore_index: 19                   # void — excluded from loss + mIoU (background 0 is kept, U-TAE style)
 folds: [1, 2, 3, 4, 5]             # official 5-fold CV
 train_folds: [1, 2, 3]
 val_folds: [4]

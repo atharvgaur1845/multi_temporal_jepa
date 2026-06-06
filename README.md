@@ -204,9 +204,10 @@ tests/        unit tests (TDD); test_model_synthetic runs the full wiring withou
 
 ## 4. Configuration
 
-- `configs/data/pastis.yaml` — dataset root, folds (official 5-fold), band count, num_classes
-  (18 crops + background, ignore_index 0), DOY encoding, few-shot fractions. Set `root` after
-  download (or use the `PASTIS_ROOT` env var).
+- `configs/data/pastis.yaml` — dataset root, folds (official 5-fold), band count, **num_classes
+  20** (PASTIS labels: 0=background, 1–18 crops, 19=void) with **ignore_index 19** (void excluded
+  from loss + mIoU; background kept, U-TAE-style), DOY encoding, few-shot fractions. Set `root`
+  after download (or use the `PASTIS_ROOT` env var).
 - `configs/model/tjepa.yaml` — objective switch (`temporal_jepa | spatial_jepa | mae | byol |
   simclr`); **`device:`** — the single GPU knob (`cuda` / `cuda:1` / `cuda:2` / `cpu`), overridable
   per-run with `--device`; encoder dims (default 512); **predictor 384** (must stay < encoder —
