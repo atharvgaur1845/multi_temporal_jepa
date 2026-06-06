@@ -98,13 +98,15 @@ def main():
     print(f"[run_matrix] device = {device}")
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
 
-    train = PASTIS(data_cfg["root"], folds=data_cfg["train_folds"], return_label=False)
+    msl = data_cfg.get("max_seq_len")
+    train = PASTIS(data_cfg["root"], folds=data_cfg["train_folds"], return_label=False,
+                   max_seq_len=msl, subsample_train=True)
     mean, std = compute_band_stats(train, max_samples=200)
     train.norm_mean, train.norm_std = mean, std
     val = PASTIS(data_cfg["root"], folds=data_cfg["val_folds"], return_label=True,
-                 norm_mean=mean, norm_std=std)
+                 norm_mean=mean, norm_std=std, max_seq_len=msl)
     probe_tr = PASTIS(data_cfg["root"], folds=data_cfg["train_folds"], return_label=True,
-                      norm_mean=mean, norm_std=std)
+                      norm_mean=mean, norm_std=std, max_seq_len=msl)
 
     with open(args.out, "w", newline="") as f:
         writer = csv.writer(f)

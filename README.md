@@ -234,9 +234,19 @@ tests/        unit tests (TDD); test_model_synthetic runs the full wiring withou
   set to 0 for pure I-JEPA); optimizer (AdamW, warmup→cosine LR, cosine wd ramp, flip `augment`,
   AMP, grad-accum).
 
-**GPU / memory:** 512-dim encoder × ~40 frames × batch 64 is heavy. If you OOM: lower
-`optim.batch_size` and raise `optim.grad_accum` (effective batch unchanged), or drop
-`encoder.embed_dim` to 256 (predictor auto-clamps to stay narrower).
+**GPU / memory (tuned for a 15–16 GB card).** Defaults use the full temporal sequence and a
+healthy batch: `embed_dim 512`, `max_seq_len 61`, `batch_size 48`, `grad_accum 4`,
+`grad_checkpoint: true` → **est. peak ≈ 11 GB** (calibrated from on-GPU measurements; batch 56
+≈ 13 GB, batch 64 ≈ 14.5 GB). The levers, in order of impact:
+- **`encoder.grad_checkpoint: true`** — recompute activations in backward; the big cut (~3× less
+  memory, what makes full 61-frame sequences affordable). Costs ~25% wall-clock; with only ~11 GB
+  used you have room, but full frames at embed 512 need it.
+- **`data.max_seq_len`** (61 = all PASTIS acquisitions; best for the temporal method). Lower to
+  32 to roughly halve memory on a smaller card. `B×T` frames flow through the spatial ViT.
+- **`optim.batch_size` / `optim.grad_accum`** — per-step `batch_size` sets memory; `grad_accum`
+  raises the *effective* batch for **free** (grads accumulate). Default 48×4 = effective 192;
+  raise `batch_size` to 56 (~13 GB) if `nvidia-smi` shows headroom. Drop `embed_dim` to 256
+  (predictor auto-clamps) for another large saving if needed.
 
 ---
 

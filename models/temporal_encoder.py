@@ -13,6 +13,7 @@ temporal positional encoding (models/pos_embed.doy_sincos_pos_embed).
 from __future__ import annotations
 
 import torch.nn as nn
+import torch.utils.checkpoint as cp
 
 from .pos_embed import doy_sincos_pos_embed
 from .vit import Block
@@ -31,13 +32,14 @@ class TemporalEncoder(nn.Module):
     frames are ignored. We fold N into the batch so each spatial location attends across time.
     """
 
-    def __init__(self, embed_dim=256, depth=4, num_heads=8, mlp_ratio=4.0):
+    def __init__(self, embed_dim=256, depth=4, num_heads=8, mlp_ratio=4.0, grad_checkpoint=False):
         super().__init__()
         self.embed_dim = embed_dim
         self.blocks = nn.ModuleList(
             [Block(embed_dim, num_heads, mlp_ratio) for _ in range(depth)]
         )
         self.norm = nn.LayerNorm(embed_dim)
+        self.grad_checkpoint = grad_checkpoint
 
     def forward(self, tokens, dates, pad_mask=None):
         B, T, N, D = tokens.shape
@@ -51,7 +53,10 @@ class TemporalEncoder(nn.Module):
         if pad_mask is not None:
             kpm = pad_mask.unsqueeze(1).expand(B, N, T).reshape(B * N, T)
         for blk in self.blocks:
-            x = blk(x, key_padding_mask=kpm)
+            if self.grad_checkpoint and self.training and x.requires_grad:
+                x = cp.checkpoint(blk, x, kpm, use_reentrant=False)
+            else:
+                x = blk(x, key_padding_mask=kpm)
         x = self.norm(x)
         # back to (B, T, N, D)
         return x.reshape(B, N, T, D).permute(0, 2, 1, 3).contiguous()

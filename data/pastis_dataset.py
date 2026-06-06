@@ -71,12 +71,17 @@ class PASTIS(Dataset):
     """
 
     def __init__(self, root, folds, norm_mean=None, norm_std=None, return_label=False,
-                 sem_channel=0):
+                 sem_channel=0, max_seq_len=None, subsample_train=False):
         super().__init__()
         self.root = str(root)
         self.folds = list(folds)
         self.return_label = return_label
         self.sem_channel = sem_channel
+        # Cap the number of acquisitions per series to bound memory (B*T frames go through the
+        # spatial ViT). subsample_train=True => random subset (pretraining aug); else evenly
+        # spaced (deterministic, for eval). None => keep all frames.
+        self.max_seq_len = max_seq_len
+        self.subsample_train = subsample_train
         self.norm_mean = None if norm_mean is None else torch.as_tensor(norm_mean).float()
         self.norm_std = None if norm_std is None else torch.as_tensor(norm_std).float()
 
@@ -110,6 +115,11 @@ class PASTIS(Dataset):
         s2 = np.load(os.path.join(self.root, "DATA_S2", f"S2_{pid}.npy"))  # (T, 10, 128, 128)
         data = torch.from_numpy(s2.astype(np.float32))
         dates = torch.tensor([_yyyymmdd_to_doy(d) for d in raw_dates], dtype=torch.long)
+
+        if self.max_seq_len is not None and data.shape[0] > self.max_seq_len:
+            from .transforms import temporal_subsample
+            data, dates = temporal_subsample(data, dates, self.max_seq_len,
+                                             train=self.subsample_train)
 
         if self.norm_mean is not None and self.norm_std is not None:
             mean = self.norm_mean.view(1, -1, 1, 1)

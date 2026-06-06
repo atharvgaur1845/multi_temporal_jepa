@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.utils.checkpoint as cp
 
 
 class Attention(nn.Module):
@@ -67,17 +68,21 @@ class ViTEncoder(nn.Module):
         pos_embed : (N, D) or (B, N, D) added to tokens if provided.
     """
 
-    def __init__(self, embed_dim=256, depth=6, num_heads=8, mlp_ratio=4.0):
+    def __init__(self, embed_dim=256, depth=6, num_heads=8, mlp_ratio=4.0, grad_checkpoint=False):
         super().__init__()
         self.blocks = nn.ModuleList(
             [Block(embed_dim, num_heads, mlp_ratio) for _ in range(depth)]
         )
         self.norm = nn.LayerNorm(embed_dim)
+        self.grad_checkpoint = grad_checkpoint
 
     def forward(self, tokens, pos_embed=None, key_padding_mask=None):
         x = tokens
         if pos_embed is not None:
             x = x + pos_embed.to(x.dtype)
         for blk in self.blocks:
-            x = blk(x, key_padding_mask=key_padding_mask)
+            if self.grad_checkpoint and self.training and x.requires_grad:
+                x = cp.checkpoint(blk, x, key_padding_mask, use_reentrant=False)
+            else:
+                x = blk(x, key_padding_mask=key_padding_mask)
         return self.norm(x)

@@ -131,8 +131,9 @@ def main(config_path, data_config_path, device=None):
     device = resolve_device(device or cfg.get("device"))
     print(f"[train_jepa] device = {device}")
 
-    # data
-    train = PASTIS(data_cfg["root"], folds=data_cfg["train_folds"], return_label=False)
+    # data (cap frames per series to bound memory; random subsample as augmentation)
+    train = PASTIS(data_cfg["root"], folds=data_cfg["train_folds"], return_label=False,
+                   max_seq_len=data_cfg.get("max_seq_len"), subsample_train=True)
     if data_cfg.get("norm_mean") is None:
         mean, std = compute_band_stats(train, max_samples=200)
         train.norm_mean, train.norm_std = mean, std

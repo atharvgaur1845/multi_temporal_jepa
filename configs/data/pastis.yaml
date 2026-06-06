@@ -12,7 +12,8 @@ val_folds: [4]
 test_folds: [5]
 
 # temporal handling
-max_seq_len: 61                    # pad/truncate target for variable-length series (38..61)
+max_seq_len: 61                    # full PASTIS temporal range (38..61) — best for the temporal
+                                   # method. Lower (e.g. 32) to save memory on a smaller card.
 date_encoding: doy                 # day-of-year (irregular cadence!) — NOT integer index
 
 # normalization: per-band mean/std — TODO compute from train folds (see data/transforms.py)

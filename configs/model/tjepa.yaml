@@ -8,6 +8,7 @@ encoder:
   depth: 6                         # spatial ViT depth
   num_heads: 8                     # head_dim = 512/8 = 64
   temporal_depth: 4                # factorized temporal transformer depth
+  grad_checkpoint: true            # recompute activations in backward -> big memory cut (~25% slower)
 
 predictor:
   # MUST be narrower than encoder.embed_dim — the asymmetry bottleneck is half the anti-collapse
@@ -44,8 +45,11 @@ optim:
   weight_decay_start: 0.04
   weight_decay_end: 0.40
   epochs: 100
-  batch_size: 64                   # effective batch via grad_accum on a single GPU
-  grad_accum: 4
+  # Memory: per-step batch is the lever; grad_accum raises the EFFECTIVE batch for FREE (grads
+  # accumulate, no extra memory). Defaults below target a ~15-16 GB card at embed_dim 512 +
+  # grad_checkpoint + full max_seq_len 61: est peak ~11 GB at batch 48 (batch 56 ~13 GB, 64 ~14.5).
+  batch_size: 48                   # ~11 GB; raise to 56 (~13 GB) if nvidia-smi shows headroom
+  grad_accum: 4                    # effective batch = batch_size * grad_accum = 192
   amp: true
   augment: true                    # random H/V flips during pretraining (label-free)
   # weight_decay is cosine-ramped weight_decay_start -> weight_decay_end over training.
