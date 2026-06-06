@@ -16,15 +16,24 @@ import torch.nn.functional as F
 
 
 @torch.no_grad()
-def extract_dense_features(encoder, batch, img_size=128):
+def extract_dense_features(encoder, batch, img_size=128, use_temporal=True):
     """Run the FROZEN encoder, temporally pool, upsample token features to (B, D, H, W).
 
-    Uses the spatiotemporal path: encode_temporal -> (B, T, N, D); masked-mean over real frames
-    -> (B, N, D); reshape to the (H', W') token grid -> bilinear upsample to full resolution.
+    use_temporal=True  : spatiotemporal path (encode_temporal) — for methods that trained the
+                         temporal encoder (temporal/spatial JEPA).
+    use_temporal=False : spatial-only path (encode_full per frame) then masked-mean over time —
+                         for baselines (MAE/BYOL/SimCLR) that train only the spatial encoder, so
+                         their untrained temporal encoder doesn't corrupt the probe (fair eval).
+    Then reshape to the (H',W') token grid -> bilinear upsample to full resolution.
     """
     encoder.eval()
     data, dates, pad_mask = batch["data"], batch["dates"], batch["pad_mask"]
-    tok = encoder.encode_temporal(data, dates, pad_mask)          # (B, T, N, D)
+    if use_temporal:
+        tok = encoder.encode_temporal(data, dates, pad_mask)     # (B, T, N, D)
+    else:
+        B, T = data.shape[:2]
+        flat = data.reshape(B * T, *data.shape[2:])
+        tok = encoder.encode_full(flat).reshape(B, T, encoder.num_patches, encoder.embed_dim)
     m = pad_mask.float()[:, :, None, None]                        # (B, T, 1, 1)
     pooled = (tok * m).sum(dim=1) / m.sum(dim=1).clamp_min(1.0)   # (B, N, D)
     B, N, D = pooled.shape
@@ -52,8 +61,12 @@ def miou_from_confusion(conf, ignore_index=None):
 
 
 def linear_probe_segmentation(encoder, train_loader, val_loader, num_classes=19,
-                              ignore_index=0, epochs=20, lr=1e-3, device=None):
+                              ignore_index=0, epochs=20, lr=1e-3, device=None,
+                              use_temporal=True):
     """Freeze encoder; train a 1x1-conv head -> per-pixel logits; report mIoU.
+
+    use_temporal selects the feature pathway (see extract_dense_features): True for JEPA,
+    False for spatial-only baselines.
 
     Returns: dict(miou=..., per_class_iou=tensor).
     """
@@ -65,7 +78,7 @@ def linear_probe_segmentation(encoder, train_loader, val_loader, num_classes=19,
     # infer feature dim from one batch
     sample = next(iter(train_loader))
     sample = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in sample.items()}
-    D = extract_dense_features(encoder, sample).shape[1]
+    D = extract_dense_features(encoder, sample, use_temporal=use_temporal).shape[1]
     head = nn.Conv2d(D, num_classes, 1).to(device)
     opt = torch.optim.AdamW(head.parameters(), lr=lr)
 
@@ -73,7 +86,7 @@ def linear_probe_segmentation(encoder, train_loader, val_loader, num_classes=19,
         head.train()
         for batch in train_loader:
             batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
-            feat = extract_dense_features(encoder, batch)
+            feat = extract_dense_features(encoder, batch, use_temporal=use_temporal)
             logits = head(feat)
             loss = F.cross_entropy(logits, batch["label"], ignore_index=ignore_index)
             opt.zero_grad(); loss.backward(); opt.step()
@@ -83,7 +96,7 @@ def linear_probe_segmentation(encoder, train_loader, val_loader, num_classes=19,
     with torch.no_grad():
         for batch in val_loader:
             batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
-            feat = extract_dense_features(encoder, batch)
+            feat = extract_dense_features(encoder, batch, use_temporal=use_temporal)
             pred = head(feat).argmax(1).cpu()
             conf += _confusion(pred, batch["label"].cpu(), num_classes, ignore_index)
     miou, per_class = miou_from_confusion(conf, ignore_index)

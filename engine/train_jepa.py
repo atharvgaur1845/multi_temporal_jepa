@@ -24,6 +24,7 @@ from models.jepa import build_model
 from objectives.jepa_loss import jepa_latent_loss
 from utils.checkpoint import save_checkpoint
 from utils.config import load_yaml
+from utils.device import resolve_device
 from utils.gpu_hours import GpuHourMeter
 from utils.seed import seed_everything
 
@@ -43,6 +44,25 @@ def _lr_at(step, total_steps, warmup_steps, base_lr, min_lr):
     return min_lr + 0.5 * (base_lr - min_lr) * (1 + math.cos(math.pi * progress))
 
 
+def _wd_at(step, total_steps, wd_start, wd_end):
+    """Cosine ramp of weight decay wd_start -> wd_end (I-JEPA ramps 0.04 -> 0.40)."""
+    progress = min(1.0, max(0.0, step / max(1, total_steps)))
+    return wd_end + 0.5 * (wd_start - wd_end) * (1 + math.cos(math.pi * progress))
+
+
+def _augment_flips(batch):
+    """Cheap label-free pretraining augmentation: random H/V flips applied to the whole series.
+    Pretraining has no labels, so flipping (B,T,C,H,W) is safe and doubles effective data."""
+    data = batch["data"]
+    if torch.rand(1).item() < 0.5:
+        data = torch.flip(data, dims=[-1])
+    if torch.rand(1).item() < 0.5:
+        data = torch.flip(data, dims=[-2])
+    batch = dict(batch)
+    batch["data"] = data
+    return batch
+
+
 def train_one_epoch(model, loader, optimizer, scaler, cfg, step0, total_steps, device,
                     logger=print):
     """Run one epoch. Returns the updated global step."""
@@ -54,18 +74,25 @@ def train_one_epoch(model, loader, optimizer, scaler, cfg, step0, total_steps, d
     grad_accum = optim_cfg.get("grad_accum", 1)
     warmup_steps = optim_cfg.get("warmup_epochs", 0) * len(loader)
     base_lr, min_lr = optim_cfg["lr"], optim_cfg.get("min_lr", 0.0)
+    wd_start = optim_cfg.get("weight_decay_start", 0.04)
+    wd_end = optim_cfg.get("weight_decay_end", wd_start)
+    augment = optim_cfg.get("augment", True)
 
     step = step0
     optimizer.zero_grad(set_to_none=True)
     for it, batch in enumerate(loader):
         batch = _to_device(batch, device)
+        if augment:
+            batch = _augment_flips(batch)
 
         lr = _lr_at(step, total_steps, warmup_steps, base_lr, min_lr)
+        wd = _wd_at(step, total_steps, wd_start, wd_end)
         for g in optimizer.param_groups:
             g["lr"] = lr
+            g["weight_decay"] = wd
 
         with torch.autocast(device_type=device.type, enabled=optim_cfg.get("amp", True)):
-            pred, target = model(batch)
+            pred, target, ctx = model(batch)
             loss = jepa_latent_loss(pred, target, norm_target=loss_cfg.get("target_layernorm", True),
                                     loss_type=loss_cfg.get("type", "l2"))
         scaler.scale(loss / grad_accum).backward()
@@ -79,19 +106,22 @@ def train_one_epoch(model, loader, optimizer, scaler, cfg, step0, total_steps, d
             ema_update(model.context_encoder, model.target_encoder, m)
 
         if step % log_cfg.get("diagnostics_every", 50) == 0:
-            diag = collapse_metrics(target, pred=pred, target=target)
-            logger(f"step {step} loss {loss.item():.4f} lr {lr:.2e} "
+            # measure collapse on the TRAINABLE context embedding (not the EMA-smoothed target,
+            # which lags and can mask an in-progress collapse).
+            diag = collapse_metrics(ctx, pred=pred, target=target)
+            logger(f"step {step} loss {loss.item():.4f} lr {lr:.2e} wd {wd:.3f} "
                    f"std {diag['per_dim_std']:.3f} effrank {diag['effective_rank']:.1f} "
                    f"varratio {diag.get('variance_ratio', float('nan')):.3f}")
         step += 1
     return step
 
 
-def main(config_path, data_config_path):
+def main(config_path, data_config_path, device=None):
     cfg = load_yaml(config_path)
     data_cfg = load_yaml(data_config_path)
     seed_everything(cfg["log"].get("seed", 0))
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = resolve_device(device or cfg.get("device"))
+    print(f"[train_jepa] device = {device}")
 
     # data
     train = PASTIS(data_cfg["root"], folds=data_cfg["train_folds"], return_label=False)
@@ -107,7 +137,7 @@ def main(config_path, data_config_path):
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.AdamW(params, lr=cfg["optim"]["lr"],
                                   weight_decay=cfg["optim"].get("weight_decay_start", 0.04))
-    scaler = torch.cuda.amp.GradScaler(enabled=cfg["optim"].get("amp", True))
+    scaler = torch.amp.GradScaler(device.type, enabled=cfg["optim"].get("amp", True))
 
     epochs = cfg["optim"]["epochs"]
     total_steps = epochs * len(loader)
@@ -128,5 +158,6 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/model/tjepa.yaml")
     ap.add_argument("--data", default="configs/data/pastis.yaml")
+    ap.add_argument("--device", default=None, help="override config device, e.g. cuda:1")
     args = ap.parse_args()
-    main(args.config, args.data)
+    main(args.config, args.data, device=args.device)

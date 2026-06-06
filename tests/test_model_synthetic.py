@@ -34,8 +34,9 @@ def test_target_encoder_frozen():
 
 def test_temporal_forward_shapes_and_grad():
     m = _small("temporal_jepa")
-    pred, target = m(_batch())
+    pred, target, ctx = m(_batch())
     assert pred.shape == target.shape
+    assert ctx.shape[0] == pred.shape[0]
     loss = jepa_latent_loss(pred, target)
     loss.backward()
     # context encoder + predictor get gradient; target encoder gets none.
@@ -45,7 +46,7 @@ def test_temporal_forward_shapes_and_grad():
 
 def test_spatial_forward_shapes():
     m = _small("spatial_jepa")
-    pred, target = m(_batch())
+    pred, target, ctx = m(_batch())
     assert pred.shape == target.shape and pred.dim() == 3
 
 

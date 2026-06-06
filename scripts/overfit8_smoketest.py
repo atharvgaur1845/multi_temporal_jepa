@@ -64,9 +64,11 @@ def main():
     ap.add_argument("--pastis", action="store_true")
     ap.add_argument("--std-floor", type=float, default=0.05)
     ap.add_argument("--rank-floor", type=float, default=2.0)
+    ap.add_argument("--device", default=None, help="e.g. cuda:1 (default: auto)")
     args = ap.parse_args()
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    from utils.device import resolve_device
+    device = resolve_device(args.device)
     batch = load_pastis_batch() if args.pastis else make_synthetic_batch()
     batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
 
@@ -80,7 +82,7 @@ def main():
     last = {}
     for step in range(args.steps):
         model.train()
-        pred, target = model(batch)
+        pred, target, ctx = model(batch)
         loss = jepa_latent_loss(pred, target)
         opt.zero_grad(); loss.backward(); opt.step()
         m = momentum_schedule(step, args.steps)
@@ -88,7 +90,8 @@ def main():
         if first_loss is None:
             first_loss = loss.item()
         if step % 50 == 0 or step == args.steps - 1:
-            diag = collapse_metrics(target, pred=pred, target=target)
+            # collapse measured on the trainable context embedding (see diagnostics rationale)
+            diag = collapse_metrics(ctx, pred=pred, target=target)
             last = diag
             print(f"step {step:4d}  loss {loss.item():.4f}  std {diag['per_dim_std']:.3f}  "
                   f"effrank {diag['effective_rank']:.2f}  varratio {diag['variance_ratio']:.3f}")

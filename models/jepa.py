@@ -92,6 +92,10 @@ class JEPA(nn.Module):
         self.min_context = min_context
         self.n_targets = n_targets
 
+        assert pred_dim < embed_dim, (
+            f"predictor width ({pred_dim}) must be NARROWER than encoder width ({embed_dim}) "
+            "— the asymmetry bottleneck is half the anti-collapse mechanism."
+        )
         self.context_encoder = SITSEncoder(img_size, patch_size, in_chans, embed_dim,
                                            depth, num_heads, temporal_depth)
         self.target_encoder = copy.deepcopy(self.context_encoder)
@@ -104,6 +108,12 @@ class JEPA(nn.Module):
 
     # ---------------------------------------------------------------- forward
     def forward(self, batch, mask_spec=None):
+        """Returns (pred, target, context_repr).
+
+        context_repr is the TRAINABLE context-encoder output used for the prediction. It (not
+        the EMA target) is the right thing to watch for collapse: the target is EMA-smoothed and
+        lags, so it can look healthy while the student is already collapsing.
+        """
         if self.objective == "spatial_jepa":
             return self._forward_spatial(batch, mask_spec)
         return self._forward_temporal(batch)
@@ -133,46 +143,71 @@ class JEPA(nn.Module):
         with torch.no_grad():
             full = self.target_encoder.encode_full(frame)                 # (B, N, D)
             z_tgt = full[:, tgt_idx]                                      # (B, Nt, D)
-        return pred, z_tgt
+        return pred, z_tgt, z_ctx
 
     def _forward_temporal(self, batch):
         data, dates, pad_mask = batch["data"], batch["dates"], batch["pad_mask"]
-        n_real = pad_mask.sum(dim=1)
-        L = int(n_real.min().item())
-        s_lo, s_hi = self.min_context - 1, L - 1 - self.horizon
-        if s_hi < s_lo:
-            raise ValueError(f"batch too short: min_real={L}, min_context={self.min_context}, "
-                             f"horizon={self.horizon}")
-        s = int(torch.randint(s_lo, s_hi + 1, (1,)).item())
-        tgt_t = s + self.horizon
+        B, T = pad_mask.shape
+        device = data.device
+        n_real = pad_mask.sum(dim=1)                                      # (B,)
 
-        ctx_data = data[:, : s + 1]
-        ctx_dates = dates[:, : s + 1]
-        ctx_pad = pad_mask[:, : s + 1]
-        ctx_tok = self.context_encoder.encode_temporal(ctx_data, ctx_dates, ctx_pad)  # (B,s+1,N,D)
-        ctx_repr = ctx_tok[:, -1]                                          # most recent ctx frame (B,N,D)
+        # PER-SAMPLE causal split (richer than a batch-shared rank). Real frames are
+        # front-packed by the collate, so position == chronological rank.
+        s_lo = self.min_context - 1
+        s_hi = n_real - 1 - self.horizon                                  # (B,) inclusive
+        if (s_hi < s_lo).any():
+            raise ValueError(f"a sample is too short: min n_real in batch={int(n_real.min())}, "
+                             f"min_context={self.min_context}, horizon={self.horizon}")
+        r = torch.rand(B, device=device)
+        s = (s_lo + (r * (s_hi - s_lo + 1).float()).floor().long())
+        s = torch.minimum(s, s_hi)                                        # safety clamp (B,)
+        tgt_idx = s + self.horizon                                        # (B,) real future frame
 
-        tgt_frame = data[:, tgt_t]                                         # (B, C, H, W)
-        tgt_date = dates[:, tgt_t]                                         # (B,)
-        spat = self.context_encoder.spatial_pos.unsqueeze(0)              # (1, N, D)
+        # context-only mask: hide the target + everything after it from temporal attention
+        # (no future leakage) AND from the masked-mean pool below.
+        ctx_mask = (torch.arange(T, device=device)[None, :] <= s[:, None]) & pad_mask  # (B,T)
+        ctx_tok = self.context_encoder.encode_temporal(data, dates, ctx_mask)  # (B,T,N,D)
+        m = ctx_mask.float()[:, :, None, None]
+        ctx_repr = (ctx_tok * m).sum(dim=1) / m.sum(dim=1).clamp_min(1.0)  # (B,N,D) mean over PAST
+
+        bidx = torch.arange(B, device=device)
+        tgt_frame = data[bidx, tgt_idx]                                  # (B, C, H, W)
+        tgt_date = dates[bidx, tgt_idx]                                  # (B,)
+        spat = self.context_encoder.spatial_pos.unsqueeze(0)             # (1, N, D)
         doy = doy_sincos_pos_embed(tgt_date.unsqueeze(1), self.embed_dim).squeeze(1)  # (B, D)
-        target_pos = spat + doy.unsqueeze(1)                              # (B, N, D)
-        pred = self.predictor(ctx_repr, target_pos)                      # (B, N, D)
+        target_pos = spat + doy.unsqueeze(1)                             # (B, N, D)
+        pred = self.predictor(ctx_repr, target_pos)                     # (B, N, D)
 
         with torch.no_grad():
-            z_tgt = self.target_encoder.encode_full(tgt_frame)            # (B, N, D)
-        return pred, z_tgt
+            z_tgt = self.target_encoder.encode_full(tgt_frame)           # (B, N, D)
+        return pred, z_tgt, ctx_repr
 
 
 def build_model(cfg):
-    """Construct a JEPA from a tjepa.yaml-style config dict."""
+    """Construct a JEPA from a tjepa.yaml-style config dict.
+
+    Enforces the predictor bottleneck: if the configured predictor width is >= the encoder
+    width (which would break the asymmetry that prevents collapse), it is clamped to half the
+    encoder width and the head count is adjusted to ~32-dim heads. This keeps the invariant
+    valid across the embed-dim ablation grid {128,256,512,768} without manual per-cell tuning.
+    """
     enc = cfg["encoder"]
     pred = cfg["predictor"]
     temp = cfg.get("temporal", {})
+    edim = enc["embed_dim"]
+    pdim = pred["embed_dim"]
+    pheads = pred["num_heads"]
+    if pdim >= edim:
+        pdim = edim // 2
+        pheads = max(1, pdim // 32)
+        print(f"[build_model] predictor width clamped to {pdim} (heads {pheads}) "
+              f"to stay narrower than encoder width {edim}.")
+    if pdim % pheads != 0:
+        pheads = max(1, pdim // 32)
     return JEPA(
         objective=cfg.get("objective", "temporal_jepa"),
-        patch_size=enc["patch_size"], embed_dim=enc["embed_dim"], depth=enc["depth"],
+        patch_size=enc["patch_size"], embed_dim=edim, depth=enc["depth"],
         num_heads=enc["num_heads"], temporal_depth=enc.get("temporal_depth", 4),
-        pred_dim=pred["embed_dim"], pred_depth=pred["depth"], pred_heads=pred["num_heads"],
+        pred_dim=pdim, pred_depth=pred["depth"], pred_heads=pheads,
         horizon=temp.get("horizon", 1), min_context=temp.get("min_context", 4),
     )

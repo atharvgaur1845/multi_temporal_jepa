@@ -1,17 +1,22 @@
 # Temporal JEPA model + training config.
 objective: temporal_jepa           # one of: temporal_jepa | spatial_jepa | mae | byol | simclr
+device: cuda                       # SINGLE GPU knob: cuda | cuda:1 | cuda:2 | cpu (or --device)
 
 encoder:
   patch_size: 16                   # 128/16 = 8x8 = 64 tokens/frame  (P=8 -> 256 tokens is an ablation)
-  embed_dim: 256                   # ablation grid: {128, 256, 512, 768}
+  embed_dim: 512                   # ablation grid: {128, 256, 512, 768}
   depth: 6                         # spatial ViT depth
-  num_heads: 8
+  num_heads: 8                     # head_dim = 512/8 = 64
   temporal_depth: 4                # factorized temporal transformer depth
 
 predictor:
-  embed_dim: 384                   # FIXED narrow width — the I-JEPA asymmetry bottleneck (keep ~384)
+  # MUST be narrower than encoder.embed_dim — the asymmetry bottleneck is half the anti-collapse
+  # mechanism. I-JEPA's literal 384 is relative to a ViT-H encoder (1280); the invariant that
+  # matters is predictor < encoder. With encoder 512 we use the I-JEPA value 384 (0.75x).
+  # build_model auto-clamps if a config ever sets predictor >= encoder.
+  embed_dim: 384
   depth: 6                         # ablation grid: {1, 2, 4, 6}
-  num_heads: 12
+  num_heads: 12                    # head_dim = 384/12 = 32
 
 ema:
   base_momentum: 0.996
@@ -38,6 +43,8 @@ optim:
   batch_size: 64                   # effective batch via grad_accum on a single GPU
   grad_accum: 4
   amp: true
+  augment: true                    # random H/V flips during pretraining (label-free)
+  # weight_decay is cosine-ramped weight_decay_start -> weight_decay_end over training.
 
 log:
   diagnostics_every: 50            # steps; ALWAYS pair loss with collapse diagnostics + a probe

@@ -9,9 +9,11 @@ SimCLR) on **PASTIS** (Sentinel-2 crop time series).
 > **Research question.** Can a *temporal* JEPA objective learn more useful representations for
 > remote sensing than *spatial* JEPA, under equal compute?
 
-**Status:** the full pipeline is implemented and verified. The M1 correctness gate
-(`overfit-8` + collapse diagnostics) passes for both objectives on synthetic data; `pytest` is
-green (18 passed, 3 data-dependent tests skipped until PASTIS is present).
+**Status:** the full pipeline — temporal/spatial JEPA **and** all three baselines (MAE, BYOL,
+SimCLR) — is implemented and verified. The M1 correctness gate (`overfit-8` + collapse
+diagnostics) passes for both JEPA objectives on synthetic data; `pytest` is green (18 passed,
+3 data-dependent tests skipped until PASTIS is present). A single `run_matrix.py` run fills the
+entire comparison table; nothing is left unwired.
 
 ---
 
@@ -22,10 +24,11 @@ pip install -r requirements.txt
 pytest -q                                   # logic tests (no data needed)
 python scripts/overfit8_smoketest.py        # M1 gate on synthetic data (no download)
 # --- on the server, with a GPU + ~30 GB free disk ---
+# pick your GPU ONCE: set `device:` in configs/model/tjepa.yaml (cuda / cuda:1 / cuda:2 / cpu)
 bash scripts/download_pastis.sh ./data_root # ~28.76 GB
 export PASTIS_ROOT=$(pwd)/data_root/PASTIS
 python -m engine.train_jepa --config configs/model/tjepa.yaml --data configs/data/pastis.yaml
-python scripts/run_matrix.py                # full experiment matrix (GPU-weeks)
+python scripts/run_matrix.py                # full matrix: JEPA + all baselines (GPU-weeks)
 ```
 
 Full server command reference is in **§7**.
@@ -41,7 +44,7 @@ PASTIS series X[T,10,128,128] + DOY dates d[T]
 per-frame PatchEmbed (Conv 10→D, P=16 → 8×8=64 tokens/frame) + 2D spatial pos + DOY temporal pos
    ├─► CONTEXT path:  spatial ViT (per frame) → temporal transformer (past frames) → z_ctx
    │                                                              │
-   │                         PREDICTOR (narrow, width 384): z_ctx + mask tokens(future pos/DOY)
+   │                         PREDICTOR (narrow, 384 < encoder 512): z_ctx + mask tokens(future pos/DOY)
    │                                                              ▼  ẑ_future
    └─► TARGET path (EMA encoder, stop-grad): encode FUTURE frame → LayerNorm → z_future
                                                                   │
@@ -49,7 +52,7 @@ per-frame PatchEmbed (Conv 10→D, P=16 → 8×8=64 tokens/frame) + 2D spatial p
 ```
 
 Three anti-collapse mechanisms work together: **EMA target** (lagging teacher), **stop-gradient**
-on the target, and the **narrow predictor** bottleneck (width 384 < encoder width).
+on the target, and the **narrow predictor** bottleneck (predictor width < encoder width).
 
 ---
 
@@ -60,10 +63,10 @@ configs/      yaml configs (data + model/training)
 data/         PASTIS Dataset, variable-length collate, normalization, splits
 masking/      spatial multi-block sampler + causal past→future temporal split
 models/       patch embed, positional encodings, ViT, temporal encoder, predictor, JEPA assembly
-objectives/   JEPA latent loss + MAE/BYOL/SimCLR baseline losses
-engine/       training loop, EMA, collapse diagnostics
+objectives/   JEPA latent loss + MAE/BYOL/SimCLR baseline losses & heads (incl. MAEModel)
+engine/       JEPA training loop, baseline training drivers, EMA, collapse diagnostics
 eval/         linear probe (mIoU), k-NN, few-shot, feature-space analysis
-utils/        seeding, config loading, checkpointing, GPU-hour metering
+utils/        seeding, config loading, checkpointing, GPU-hour metering, device knob
 scripts/      download, overfit-8 smoketest (M1 gate), experiment-matrix driver
 tests/        unit tests (TDD); test_model_synthetic runs the full wiring without data
 ```
@@ -121,11 +124,12 @@ tests/        unit tests (TDD); test_model_synthetic runs the full wiring withou
 - **`temporal_encoder.py`** — factorized **space→time**: adds DOY pos along T, folds the N spatial
   tokens into the batch so attention runs over the time axis with the per-frame `pad_mask`, returns
   time-aware tokens `(B,T,N,D)`. Factorization avoids O((T·N)²) full 3-D attention.
-- **`predictor.py`** — narrow (`pred_dim=384`) transformer. Projects context to `pred_dim`,
-  appends one shared **learnable mask token + projected target positional embedding** per target
-  slot, runs blocks, reads out the mask-token outputs, projects back to encoder dim. The narrow
-  width is half the anti-collapse mechanism; the positional embedding is what makes each predicted
-  slot different.
+- **`predictor.py`** — **narrow** transformer (`pred_dim` must be < encoder `embed_dim`; default
+  384 vs 512). Projects context to `pred_dim`, appends one shared **learnable mask token +
+  projected target positional embedding** per target slot, runs blocks, reads out the mask-token
+  outputs, projects back to encoder dim. The narrow width is half the anti-collapse mechanism
+  (I-JEPA's literal 384 is relative to a much wider ViT-H encoder; the invariant is
+  predictor < encoder). `JEPA.__init__` asserts it and `build_model` clamps a mis-set config.
 - **`jepa.py`**
   - `SITSEncoder` — the shared encoder (patch embed + spatial ViT + temporal encoder) with
     `encode_full` (whole frame), `encode_subset` (visible context tokens only, I-JEPA style),
@@ -133,21 +137,23 @@ tests/        unit tests (TDD); test_model_synthetic runs the full wiring withou
   - `JEPA` — holds `context_encoder`, a **deep-copied frozen** `target_encoder`
     (`requires_grad=False`), and the `predictor`. `_forward_spatial` samples a multi-block mask on
     one frame, encodes the visible context, predicts the target-block latents, and reads targets
-    from the **full-frame** EMA encoding. `_forward_temporal` does the batch-shared causal split
-    (valid because real frames are front-packed), encodes the past, predicts the future frame's
-    tokens using its DOY as the query, and reads the target from the EMA encoder on the future
-    frame. Returns `(pred, target)`; the loss applies LayerNorm + stop-grad.
+    from the **full-frame** EMA encoding. `_forward_temporal` does a **per-sample** causal split
+    (each sample draws its own split rank; a context-only mask blocks future leakage), pools the
+    past with a **masked-mean over context frames**, predicts the future frame's tokens using its
+    DOY as the query, and reads the target from the EMA encoder on the future frame. Returns
+    `(pred, target, context_repr)`; the loss applies LayerNorm + stop-grad, and `context_repr`
+    (the trainable branch, not the lagging EMA target) is what the collapse diagnostics watch.
   - `build_model(cfg)` — construct a `JEPA` from a `tjepa.yaml`-style dict.
 
 ### `objectives/`
 - **`jepa_loss.py`** — `jepa_latent_loss(pred, target, norm_target, loss_type)`: **detaches**
   the target (stop-grad — the #1 collapse bug if forgotten), optionally LayerNorms it over the
   feature dim, then L2 (I-JEPA) or L1 (V-JEPA ablation) mean error.
-- **`baselines/`** — `mae.py` (`random_patch_mask`, `mae_loss` = MSE on masked patches only);
-  `byol.py` (`mlp_head`, `byol_loss` = `2−2·cos`, target detached); `simclr.py` (`projector`,
-  `nt_xent_loss` over a `(2B,D)` view-stacked batch, positives at offset B). These are the loss
-  functions / heads; baseline *training drivers* are a thin M4 wiring step on top of the shared
-  encoder.
+- **`baselines/`** — `mae.py` (`random_patch_mask`, `patchify`, `mae_loss` = MSE on masked
+  patches only, and **`MAEModel`** = shared backbone + lightweight decoder doing standard
+  random-shuffle masked reconstruction); `byol.py` (`mlp_head`, `byol_loss` = `2−2·cos`, target
+  detached); `simclr.py` (`projector`, `nt_xent_loss` over a `(2B,D)` view-stacked batch,
+  positives at offset B). The *training drivers* that use these live in `engine/train_baselines.py`.
 
 ### `engine/`
 - **`ema.py`** — `momentum_schedule` (linear `0.996→1.0`, clamped) and `ema_update`
@@ -157,14 +163,23 @@ tests/        unit tests (TDD); test_model_synthetic runs the full wiring withou
   entropy of the covariance), `variance_ratio` (pred vs target variance), `offdiag_covariance`
   (VICReg-style), bundled by `collapse_metrics`. **A falling loss alone is not success** — a
   collapsed model also has ~0 loss, so these are logged every N steps.
-- **`train_jepa.py`** — the pretraining loop: AMP autocast, gradient accumulation, linear-warmup
-  → cosine LR, **EMA step after the optimizer step**, diagnostics paired with loss, checkpointing.
-  `main()` builds the dataset (computing band stats if absent), model, optimizer and runs.
+- **`train_jepa.py`** — the JEPA pretraining loop: AMP autocast, gradient accumulation,
+  linear-warmup → cosine LR, **cosine weight-decay ramp** (`weight_decay_start→end`), optional
+  flip augmentation, **EMA step after the optimizer step**, diagnostics on the trainable context
+  embedding paired with loss, checkpointing. `main(config, data, device)` builds everything and runs.
+- **`train_baselines.py`** — training drivers for MAE / BYOL / SimCLR (`TRAINERS` dict). All
+  three train the **same `SITSEncoder` spatial backbone** so the probe reads them through one
+  uniform pathway (`use_temporal=False`); each returns the trained backbone. BYOL/SimCLR use a
+  global masked-mean pool over two augmented views; MAE uses `MAEModel` on a sampled frame. The
+  temporal encoder is deliberately *not* trained by the baselines — that is the JEPA contribution.
 
 ### `eval/`
-- **`linear_probe.py`** — `extract_dense_features` (frozen encoder → temporal masked-mean →
-  bilinear upsample tokens to pixels), then trains a single `1×1` conv head and reports **mIoU**
-  (dense, per-pixel — not global top-1). `miou_from_confusion` handles the ignore class.
+- **`linear_probe.py`** — `extract_dense_features(encoder, batch, use_temporal=…)` (frozen
+  encoder → masked-mean over time → bilinear upsample tokens to pixels). `use_temporal=True`
+  uses the temporal encoder (JEPA cells); `use_temporal=False` is spatial-only per frame (the
+  baselines, whose temporal encoder is untrained — fair eval). Then trains a single `1×1` conv
+  head and reports **mIoU** (dense, per-pixel — not global top-1). `miou_from_confusion` handles
+  the ignore class.
 - **`knn.py`** — `parcel_embeddings` (masked-mean feature + dominant label per patch) and
   `knn_accuracy` (cosine k-NN, majority vote). Training-free probe.
 - **`fewshot.py`** — `fewshot_eval` runs the linear probe on stratified 1/5/10% label subsets.
@@ -174,7 +189,8 @@ tests/        unit tests (TDD); test_model_synthetic runs the full wiring withou
 - `seed.py` (`seed_everything`), `config.py` (`load_yaml`/`load_config`),
   `checkpoint.py` (`save_checkpoint`/`load_checkpoint` with RNG state for reproducible resume),
   `gpu_hours.py` (`GpuHourMeter` — wall-clock + peak memory, reported per experiment so
-  comparisons are honestly "under equal compute").
+  comparisons are honestly "under equal compute"), `device.py` (`resolve_device` — the single
+  GPU knob; see §4).
 
 ### `scripts/`
 - `download_pastis.sh` — downloads PASTIS.zip (resumable `wget`), verifies size + md5, extracts.
@@ -192,8 +208,15 @@ tests/        unit tests (TDD); test_model_synthetic runs the full wiring withou
   (18 crops + background, ignore_index 0), DOY encoding, few-shot fractions. Set `root` after
   download (or use the `PASTIS_ROOT` env var).
 - `configs/model/tjepa.yaml` — objective switch (`temporal_jepa | spatial_jepa | mae | byol |
-  simclr`), encoder dims, **predictor width fixed ~384**, EMA schedule, horizon Δ + min_context,
-  loss (L2 + target LayerNorm + stop-grad), optimizer (AdamW, warmup→cosine, AMP, grad-accum).
+  simclr`); **`device:`** — the single GPU knob (`cuda` / `cuda:1` / `cuda:2` / `cpu`), overridable
+  per-run with `--device`; encoder dims (default 512); **predictor 384** (must stay < encoder —
+  `build_model` auto-clamps otherwise); EMA schedule; horizon Δ + min_context; loss (L2 + target
+  LayerNorm + stop-grad); optimizer (AdamW, warmup→cosine LR, cosine wd ramp, flip `augment`, AMP,
+  grad-accum).
+
+**GPU / memory:** 512-dim encoder × ~40 frames × batch 64 is heavy. If you OOM: lower
+`optim.batch_size` and raise `optim.grad_accum` (effective batch unchanged), or drop
+`encoder.embed_dim` to 256 (predictor auto-clamps to stay narrower).
 
 ---
 
@@ -203,7 +226,10 @@ tests/        unit tests (TDD); test_model_synthetic runs the full wiring withou
 |---|---|---|---|
 | **Temporal JEPA** (method) | future frame's EMA latent | spatial pos + **future DOY** | `JEPA._forward_temporal` |
 | **Spatial JEPA** (baseline) | masked target blocks of one frame | spatial pos | `JEPA._forward_spatial` |
-| MAE / BYOL / SimCLR | pixels / EMA view / contrastive | — | `objectives/baselines/` |
+| MAE / BYOL / SimCLR | pixels / EMA view / contrastive | — | `engine/train_baselines.py` (+ `objectives/baselines/`) |
+
+All five are selectable via `objective:` in the config and all run end-to-end in `run_matrix.py`.
+JEPA cells probe with the temporal encoder; baseline cells probe spatial-only (`use_temporal=False`).
 
 ---
 
@@ -237,9 +263,12 @@ cd multi_temporal_jepa
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
+# 0b. PICK YOUR GPU ONCE — edit configs/model/tjepa.yaml:  device: cuda:1
+#     (or override any command below with --device cuda:1)
+
 # 1. sanity before touching data (fast)
 pytest -q
-python scripts/overfit8_smoketest.py --objective temporal_jepa
+python scripts/overfit8_smoketest.py --objective temporal_jepa   # add --device cuda:1 if needed
 python scripts/overfit8_smoketest.py --objective spatial_jepa
 
 # 2. download PASTIS (~28.76 GB; resumable, verifies md5, extracts)
@@ -252,29 +281,30 @@ PASTIS_ROOT=$PASTIS_ROOT pytest -q
 #   and the M1 gate on 8 REAL samples
 python scripts/overfit8_smoketest.py --pastis --objective temporal_jepa
 
-# 4. pretrain Temporal JEPA (edit configs/model/tjepa.yaml for epochs/batch/horizon)
+# 4. pretrain Temporal JEPA (edit configs/model/tjepa.yaml for epochs/batch/horizon/device)
 python -m engine.train_jepa --config configs/model/tjepa.yaml --data configs/data/pastis.yaml
-#   checkpoints land in runs/tjepa/last.ckpt
+#   checkpoints land in runs/tjepa/last.ckpt   (override GPU: --device cuda:2)
 
 # 5. pretrain Spatial JEPA baseline (same loop, different objective)
 #   set `objective: spatial_jepa` in the config (or copy it) and re-run step 4.
 
-# 6. full experiment matrix (horizon study + ablations); GPU-WEEKS on one card
+# 6. full experiment matrix — ALL cells (JEPA horizon study + ablations + MAE/BYOL/SimCLR)
 python scripts/run_matrix.py --dry-run                 # preview the 16 cells
 python scripts/run_matrix.py --max-cells 4             # budgeted run; logs skipped cells
-python scripts/run_matrix.py                           # everything → runs/matrix_results.csv
+python scripts/run_matrix.py --device cuda:1           # everything → runs/matrix_results.csv
 
 # tip: run long jobs under tmux/nohup so they survive disconnects
 #   nohup python -m engine.train_jepa --config ... --data ... > train.log 2>&1 &
 ```
 
 **Notes & caveats**
-- The matrix driver currently trains the **JEPA-family** cells end-to-end; MAE/BYOL/SimCLR have
-  their losses/heads implemented but need a short baseline training driver (M4 wiring) before
-  they produce matrix rows — those cells are explicitly logged as skipped, not silently dropped.
+- `run_matrix.py` runs **all** cells end-to-end — temporal/spatial JEPA *and* MAE/BYOL/SimCLR;
+  `--max-cells N` caps the run and explicitly logs every skipped cell (no silent truncation).
 - Confirm the Sentinel-2 band order against the official loader before trusting band indices
   (it's `[B2,B3,B4,B5,B6,B7,B8,B8A,B11,B12]` per utae-paps; recorded in `download_pastis.sh`).
 - Compare downstream mIoU against supervised **U-TAE = 63.1** as the reference ceiling.
+- If you OOM at 512-dim/batch-64, lower `optim.batch_size` + raise `grad_accum`, or drop
+  `encoder.embed_dim` to 256 (see §4).
 
 ---
 
