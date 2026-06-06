@@ -17,14 +17,41 @@ Tensor shapes (per sample)
     label  : (H, W)         long    per-pixel crop class in [0, 18]  (0 = background/void)
 
 Batched (after collate, max length T_max)
-    data   : (B, T_max, C, H, W)
-    dates  : (B, T_max)
-    pad_mask: (B, T_max)    bool    True where the frame is real, False where padded
-    label  : (B, H, W)
+    data    : (B, T_max, C, H, W)
+    dates   : (B, T_max)
+    pad_mask: (B, T_max)   bool   True where the frame is real, False where padded
+    label   : (B, H, W)
+
+On-disk PASTIS layout (Zenodo 5012942, mirrors VSainteuf/utae-paps)
+    root/metadata.geojson                  # per-patch: ID_PATCH, Fold, dates-S2 (idx->YYYYMMDD)
+    root/DATA_S2/S2_<ID_PATCH>.npy         # (T, 10, 128, 128) float
+    root/ANNOTATIONS/TARGET_<ID_PATCH>.npy # (3, 128, 128) int; channel 0 = semantic class
 """
 from __future__ import annotations
 
+import datetime as _dt
+import json
+import os
+
+import numpy as np
+import torch
 from torch.utils.data import Dataset
+
+
+def _yyyymmdd_to_doy(d: int) -> int:
+    """Convert an integer date YYYYMMDD to its calendar day-of-year in [1, 366]."""
+    d = int(d)
+    year, month, day = d // 10000, (d // 100) % 100, d % 100
+    return _dt.date(year, month, day).timetuple().tm_yday
+
+
+def _parse_dates_field(val) -> list:
+    """PASTIS stores dates-S2 as {idx_str: YYYYMMDD}. Across versions it may be a dict or a
+    JSON string. Normalize to a list of YYYYMMDD ints in acquisition order."""
+    if isinstance(val, str):
+        val = json.loads(val)
+    items = sorted(((int(k), int(v)) for k, v in val.items()), key=lambda kv: kv[0])
+    return [v for _, v in items]
 
 
 class PASTIS(Dataset):
@@ -34,29 +61,67 @@ class PASTIS(Dataset):
     ----------
     root : str            path to the extracted PASTIS folder
     folds : list[int]     which of the 5 official folds to include
-    norm_mean, norm_std : per-band normalization stats (compute from TRAIN folds only)
+    norm_mean, norm_std : per-band normalization stats (compute from TRAIN folds only).
+                          If None, raw reflectance is returned (used when computing the stats).
     return_label : bool   pretraining can skip labels; eval needs them
+    sem_channel : int     which channel of TARGET_*.npy holds the semantic class (PASTIS = 0)
 
-    TODO
-    ----
-    - Index the patches belonging to `folds` (read the official metadata, e.g. the
-      geojson / fold table shipped with PASTIS).
-    - In __getitem__: load the (T,C,H,W) array and the per-acquisition dates, apply
-      band normalization, return (data, dates, label).
-    - Decide your DOY convention and document it (calendar DOY vs days-since-start).
+    DOY convention: calendar day-of-year in [1, 366] (NOT days-since-start), used consistently
+    by models/pos_embed.doy_sincos_pos_embed.
     """
 
-    def __init__(self, root, folds, norm_mean=None, norm_std=None, return_label=False):
+    def __init__(self, root, folds, norm_mean=None, norm_std=None, return_label=False,
+                 sem_channel=0):
         super().__init__()
-        # TODO: build self.samples (list of patch ids/paths) for the requested folds.
-        raise NotImplementedError("M0: implement PASTIS indexing")
+        self.root = str(root)
+        self.folds = list(folds)
+        self.return_label = return_label
+        self.sem_channel = sem_channel
+        self.norm_mean = None if norm_mean is None else torch.as_tensor(norm_mean).float()
+        self.norm_std = None if norm_std is None else torch.as_tensor(norm_std).float()
+
+        meta_path = os.path.join(self.root, "metadata.geojson")
+        if not os.path.isfile(meta_path):
+            raise FileNotFoundError(
+                f"metadata.geojson not found under {self.root!r}. Run scripts/download_pastis.sh "
+                "and point root at the extracted PASTIS folder."
+            )
+        with open(meta_path, "r") as f:
+            meta = json.load(f)
+
+        # self.samples = list of (id_patch, [YYYYMMDD,...]) for patches in the requested folds.
+        self.samples = []
+        for feat in meta["features"]:
+            props = feat["properties"]
+            if int(props["Fold"]) not in self.folds:
+                continue
+            pid = int(props["ID_PATCH"])
+            dates = _parse_dates_field(props["dates-S2"])
+            self.samples.append((pid, dates))
+        self.samples.sort(key=lambda s: s[0])
+        if not self.samples:
+            raise RuntimeError(f"No patches for folds {self.folds} under {self.root!r}.")
 
     def __len__(self):
-        raise NotImplementedError
+        return len(self.samples)
 
     def __getitem__(self, idx):
-        # TODO: load patch -> normalize -> (data[T,C,H,W], dates[T], label[H,W])
-        raise NotImplementedError
+        pid, raw_dates = self.samples[idx]
+        s2 = np.load(os.path.join(self.root, "DATA_S2", f"S2_{pid}.npy"))  # (T, 10, 128, 128)
+        data = torch.from_numpy(s2.astype(np.float32))
+        dates = torch.tensor([_yyyymmdd_to_doy(d) for d in raw_dates], dtype=torch.long)
+
+        if self.norm_mean is not None and self.norm_std is not None:
+            mean = self.norm_mean.view(1, -1, 1, 1)
+            std = self.norm_std.view(1, -1, 1, 1).clamp_min(1e-6)
+            data = (data - mean) / std
+
+        if not self.return_label:
+            return data, dates, None
+
+        tgt = np.load(os.path.join(self.root, "ANNOTATIONS", f"TARGET_{pid}.npy"))
+        label = torch.from_numpy(tgt[self.sem_channel].astype(np.int64))  # (128, 128)
+        return data, dates, label
 
 
 def collate_variable_length(batch):
@@ -68,14 +133,26 @@ def collate_variable_length(batch):
         pad_mask[b, t] = True iff frame t of sample b is a REAL acquisition (not padding).
 
     Returns
-        dict(data, dates, pad_mask, label)
+        dict(data, dates, pad_mask, label)   (label is None if samples carry no labels).
 
-    Pitfalls
-        - If you forget pad_mask, temporal attention will attend to zero-frames and
-          corrupt the representation (Common Mistake #8).
-        - Pad `dates` with a value the positional encoding will ignore (and that the
-          pad_mask covers) — do NOT pad with a real DOY.
-
-    TODO: implement padding + mask construction.
+    Padding choices: data padded with 0.0, dates padded with DOY=0 (never a real DOY) so the
+    temporal positional encoding + pad_mask jointly ignore those frames (Common Mistake #8).
     """
-    raise NotImplementedError("M0: implement variable-length collate")
+    datas, dates_list, labels = zip(*batch)
+    B = len(datas)
+    T_max = max(d.shape[0] for d in datas)
+    C, H, W = datas[0].shape[1:]
+
+    data = datas[0].new_zeros((B, T_max, C, H, W))
+    dates = torch.zeros((B, T_max), dtype=torch.long)
+    pad_mask = torch.zeros((B, T_max), dtype=torch.bool)
+
+    for b, (x, d) in enumerate(zip(datas, dates_list)):
+        t = x.shape[0]
+        data[b, :t] = x
+        dates[b, :t] = d
+        pad_mask[b, :t] = True
+
+    out = {"data": data, "dates": dates, "pad_mask": pad_mask}
+    out["label"] = None if labels[0] is None else torch.stack(labels, dim=0)
+    return out

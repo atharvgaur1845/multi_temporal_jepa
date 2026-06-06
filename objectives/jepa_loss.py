@@ -11,25 +11,37 @@ This is the "JEPA thesis": predict in representation space. Two non-negotiable d
    regression isn't dominated by a few high-variance dimensions and the scale is stable.
 
     loss = mean_tokens || predictor_output - sg(LayerNorm(target_encoder_output)) ||^2
-           (averaged over target tokens, then over the M target blocks)
 """
 from __future__ import annotations
 
+import torch.nn.functional as F
 
-def jepa_latent_loss(pred, target, norm_target=True):
-    """Mean squared error between predicted and target latents.
+
+def jepa_latent_loss(pred, target, norm_target=True, loss_type="l2"):
+    """Mean error between predicted and target latents.
 
     Args
         pred   : (B, N_tgt, D)   predictor outputs at target locations (gradient flows here)
-        target : (B, N_tgt, D)   target-encoder outputs (MUST be detached / stop-grad)
-        norm_target : apply LayerNorm to `target` before the loss
+        target : (B, N_tgt, D)   target-encoder outputs (detached here -> stop-grad)
+        norm_target : apply LayerNorm (over feature dim) to `target` before the loss
+        loss_type   : 'l2' (I-JEPA) or 'l1' (V-JEPA ablation); reduction is identical so the
+                      two variants are directly comparable.
 
     Returns: scalar loss.
 
-    TODO
-        - apply LayerNorm over the feature dim of `target` if norm_target.
-        - detach the target (assert/ensure no grad). Forgetting this is the #1 collapse bug.
-        - reduce: mean over feature dim -> mean over tokens -> mean over batch/blocks.
-    Ablation hook: an L1 variant (à la V-JEPA) — keep the reduction identical so it's comparable.
+    Stop-grad: `target` is detached unconditionally. Forgetting this is the #1 collapse bug;
+    tests/test_loss.py asserts target.grad is None after backward.
     """
-    raise NotImplementedError("M1")
+    target = target.detach()
+    if norm_target:
+        # LayerNorm over the feature dim only (per-token), no learnable affine.
+        target = F.layer_norm(target, (target.shape[-1],))
+
+    if loss_type == "l2":
+        per_elem = (pred - target) ** 2
+    elif loss_type == "l1":
+        per_elem = (pred - target).abs()
+    else:
+        raise ValueError(f"unknown loss_type {loss_type!r}")
+    # mean over feature dim -> tokens -> batch
+    return per_elem.mean()

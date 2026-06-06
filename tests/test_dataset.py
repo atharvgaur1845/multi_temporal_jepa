@@ -2,6 +2,9 @@
 import os
 
 import pytest
+import torch
+
+from data.pastis_dataset import PASTIS, collate_variable_length
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get("PASTIS_ROOT"),
@@ -10,18 +13,28 @@ pytestmark = pytest.mark.skipif(
 
 
 def test_sample_shapes():
-    """A sample yields (T,C,H,W) data, (T,) dates, (H,W) label with C=10, H=W=128.
-
-    TODO: instantiate PASTIS(os.environ['PASTIS_ROOT'], folds=[1], return_label=True),
-    pull one sample, assert the shapes and dtypes above and that dates are sorted/in [1,366].
-    """
-    raise NotImplementedError("M0")
+    """A sample yields (T,C,H,W) data, (T,) dates, (H,W) label with C=10, H=W=128."""
+    ds = PASTIS(os.environ["PASTIS_ROOT"], folds=[1], return_label=True)
+    data, dates, label = ds[0]
+    assert data.ndim == 4 and data.shape[1] == 10 and data.shape[2:] == (128, 128)
+    assert dates.shape == (data.shape[0],)
+    assert dates.dtype == torch.long
+    assert torch.all((dates >= 1) & (dates <= 366))
+    assert torch.all(dates[1:] >= dates[:-1]), "dates must be chronologically sorted"
+    assert label.shape == (128, 128) and label.dtype == torch.long
 
 
 def test_collate_padding_mask():
-    """A batch of variable-length series pads to T_max with a correct boolean pad_mask.
-
-    TODO: build a few samples of different T, run collate_variable_length, assert
-    data is (B,T_max,...), pad_mask True only on real frames, and pad frames are zero.
-    """
-    raise NotImplementedError("M0")
+    """A batch of variable-length series pads to T_max with a correct boolean pad_mask."""
+    ds = PASTIS(os.environ["PASTIS_ROOT"], folds=[1], return_label=True)
+    batch = [ds[i] for i in range(4)]
+    out = collate_variable_length(batch)
+    B = 4
+    T_max = max(s[0].shape[0] for s in batch)
+    assert out["data"].shape == (B, T_max, 10, 128, 128)
+    assert out["pad_mask"].shape == (B, T_max)
+    for b, (x, d, _) in enumerate(batch):
+        t = x.shape[0]
+        assert out["pad_mask"][b, :t].all()
+        assert not out["pad_mask"][b, t:].any()
+        assert torch.count_nonzero(out["data"][b, t:]) == 0  # padded frames are zero

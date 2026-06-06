@@ -14,6 +14,9 @@ from __future__ import annotations
 
 import torch.nn as nn
 
+from .pos_embed import doy_sincos_pos_embed
+from .vit import Block
+
 
 class TemporalEncoder(nn.Module):
     """Transformer over the time axis, applied per spatial token position.
@@ -23,20 +26,32 @@ class TemporalEncoder(nn.Module):
         dates    : (B, T)        for DOY temporal pos
         pad_mask : (B, T)        True = real frame
 
-    Returns time-aware tokens (B, T, N, D) (or a pooled (B, N, D) if you aggregate context).
-
-    Implementation notes / TODO
-        - Add DOY temporal positional encoding to tokens along T.
-        - Reshape so attention runs over the T axis (e.g. fold N into batch).
-        - Pass pad_mask as key_padding_mask so pad frames are ignored.
-        - Decide how the CONTEXT path summarizes past frames for the predictor
-          (e.g. take the tokens of the most recent context frame, or a learned query).
-          Document your choice — it defines what "context representation" means.
+    Returns time-aware tokens (B, T, N, D). The DOY embedding is added along T (broadcast over
+    the N spatial positions); attention runs over T with the per-frame pad_mask so padded
+    frames are ignored. We fold N into the batch so each spatial location attends across time.
     """
 
     def __init__(self, embed_dim=256, depth=4, num_heads=8, mlp_ratio=4.0):
         super().__init__()
-        raise NotImplementedError("M2")
+        self.embed_dim = embed_dim
+        self.blocks = nn.ModuleList(
+            [Block(embed_dim, num_heads, mlp_ratio) for _ in range(depth)]
+        )
+        self.norm = nn.LayerNorm(embed_dim)
 
     def forward(self, tokens, dates, pad_mask=None):
-        raise NotImplementedError("M2")
+        B, T, N, D = tokens.shape
+        # DOY temporal positional encoding, added across the time axis (broadcast over N).
+        temp_pos = doy_sincos_pos_embed(dates, D, pad_mask=pad_mask)  # (B, T, D)
+        x = tokens + temp_pos.unsqueeze(2)  # (B, T, N, D)
+
+        # fold N into batch so attention is over T: (B, T, N, D) -> (B*N, T, D)
+        x = x.permute(0, 2, 1, 3).reshape(B * N, T, D)
+        kpm = None
+        if pad_mask is not None:
+            kpm = pad_mask.unsqueeze(1).expand(B, N, T).reshape(B * N, T)
+        for blk in self.blocks:
+            x = blk(x, key_padding_mask=kpm)
+        x = self.norm(x)
+        # back to (B, T, N, D)
+        return x.reshape(B, N, T, D).permute(0, 2, 1, 3).contiguous()
