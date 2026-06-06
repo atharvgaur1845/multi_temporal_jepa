@@ -10,10 +10,18 @@ SimCLR) on **PASTIS** (Sentinel-2 crop time series).
 > remote sensing than *spatial* JEPA, under equal compute?
 
 **Status:** the full pipeline — temporal/spatial JEPA **and** all three baselines (MAE, BYOL,
-SimCLR) — is implemented and verified. The M1 correctness gate (`overfit-8` + collapse
-diagnostics) passes for both JEPA objectives on synthetic data; `pytest` is green (18 passed,
-3 data-dependent tests skipped until PASTIS is present). A single `run_matrix.py` run fills the
-entire comparison table; nothing is left unwired.
+SimCLR) — is implemented and verified. `pytest` is green (21 passed with `PASTIS_ROOT` set;
+18 + 3 skipped without). A single `run_matrix.py` run fills the entire comparison table; nothing
+is left unwired.
+
+**Architecture note — anti-collapse on temporal SITS (important).** Standard JEPA (EMA target +
+stop-grad + narrow predictor) **collapses on real PASTIS**: consecutive acquisitions of the same
+field are nearly identical, so "predict the future latent" is solvable by emitting a constant
+(the M1 gate caught this — loss→0 while per-dim std→0.04, effective rank→2.4). The fix, now part
+of the architecture and **on by default in the `main()` training path**, is a **VICReg-style
+variance–covariance regularizer** on the trainable context embedding (`objectives/jepa_loss.py:
+variance_covariance_reg`, weights `loss.var_coeff` / `loss.cov_coeff`). With it, std stays
+healthy; set both weights to 0 to recover pure I-JEPA (and to ablate that the collapse is real).
 
 ---
 
@@ -152,7 +160,11 @@ tests/        unit tests (TDD); test_model_synthetic runs the full wiring withou
 ### `objectives/`
 - **`jepa_loss.py`** — `jepa_latent_loss(pred, target, norm_target, loss_type)`: **detaches**
   the target (stop-grad — the #1 collapse bug if forgotten), optionally LayerNorms it over the
-  feature dim, then L2 (I-JEPA) or L1 (V-JEPA ablation) mean error.
+  feature dim, then L2 (I-JEPA) or L1 (V-JEPA ablation) mean error. Plus
+  **`variance_covariance_reg(z)`** — the VICReg anti-collapse term: a variance hinge
+  (`relu(1 − std_d)` per dim, keep batch-std ≥ 1) + a covariance penalty (decorrelate dims).
+  Applied to the trainable context embedding in the training loops; the EMA target is not
+  regularized. This is what stops temporal-SITS collapse (see the architecture note up top).
 - **`baselines/`** — `mae.py` (`random_patch_mask`, `patchify`, `mae_loss` = MSE on masked
   patches only, and **`MAEModel`** = shared backbone + lightweight decoder doing standard
   random-shuffle masked reconstruction); `byol.py` (`mlp_head`, `byol_loss` = `2−2·cos`, target
@@ -169,8 +181,10 @@ tests/        unit tests (TDD); test_model_synthetic runs the full wiring withou
   collapsed model also has ~0 loss, so these are logged every N steps.
 - **`train_jepa.py`** — the JEPA pretraining loop: AMP autocast, gradient accumulation,
   linear-warmup → cosine LR, **cosine weight-decay ramp** (`weight_decay_start→end`), optional
-  flip augmentation, **EMA step after the optimizer step**, diagnostics on the trainable context
-  embedding paired with loss, checkpointing. `main(config, data, device)` builds everything and runs.
+  flip augmentation, **EMA step after the optimizer step**, the **VICReg variance–covariance
+  anti-collapse term** added to the latent loss (`var_coeff`/`cov_coeff`), diagnostics on the
+  trainable context embedding paired with loss, checkpointing. `main(config, data, device)` —
+  the entry point used for real pretraining — builds everything and runs with the regularizer on.
 - **`train_baselines.py`** — training drivers for MAE / BYOL / SimCLR (`TRAINERS` dict). All
   three train the **same `SITSEncoder` spatial backbone** so the probe reads them through one
   uniform pathway (`use_temporal=False`); each returns the trained backbone. BYOL/SimCLR use a
