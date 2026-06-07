@@ -39,7 +39,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/model/tjepa.yaml")
     ap.add_argument("--data", default="configs/data/pastis.yaml")
-    ap.add_argument("--ckpt", default="runs/tjepa/last.ckpt")
+    ap.add_argument("--ckpt", default="runs/tjepa/last.ckpt",
+                    help="full JEPA checkpoint from train_jepa (uses target_encoder)")
+    ap.add_argument("--encoder-ckpt", default=None,
+                    help="per-cell encoder checkpoint from run_matrix (runs/matrix/<cell>.pt)")
     ap.add_argument("--device", default=None)
     ap.add_argument("--probe-epochs", type=int, default=20)
     ap.add_argument("--probe-batch", type=int, default=8)
@@ -53,16 +56,29 @@ def main():
     cfg = load_yaml(args.config)
     data_cfg = load_yaml(args.data)
     device = resolve_device(args.device or cfg.get("device"))
-    obj = cfg.get("objective", "temporal_jepa")
-    use_temporal = obj in ("temporal_jepa", "spatial_jepa")
     msl = data_cfg.get("max_seq_len")
-    print(f"[evaluate] ckpt={args.ckpt} objective={obj} use_temporal={use_temporal} device={device}")
 
-    # model + weights
-    model = build_model(cfg).to(device)
-    step = load_checkpoint(args.ckpt, model, map_location=device)
-    print(f"[evaluate] loaded checkpoint at step {step}")
-    encoder = model.target_encoder  # the EMA representation
+    if args.encoder_ckpt:
+        # per-cell encoder from run_matrix: rebuild a bare SITSEncoder from its saved cfg.
+        from models.jepa import SITSEncoder
+        blob = torch.load(args.encoder_ckpt, map_location=device, weights_only=False)
+        ec = blob["cfg"]["encoder"]
+        encoder = SITSEncoder(patch_size=ec["patch_size"], embed_dim=ec["embed_dim"],
+                              depth=ec["depth"], num_heads=ec["num_heads"],
+                              temporal_depth=ec.get("temporal_depth", 4)).to(device)
+        encoder.load_state_dict(blob["encoder"])
+        obj = blob.get("objective", "?")
+        use_temporal = blob.get("use_temporal", True)
+        print(f"[evaluate] encoder_ckpt={args.encoder_ckpt} objective={obj} "
+              f"use_temporal={use_temporal} device={device}")
+    else:
+        obj = cfg.get("objective", "temporal_jepa")
+        use_temporal = obj in ("temporal_jepa", "spatial_jepa")
+        print(f"[evaluate] ckpt={args.ckpt} objective={obj} use_temporal={use_temporal} device={device}")
+        model = build_model(cfg).to(device)
+        step = load_checkpoint(args.ckpt, model, map_location=device)
+        print(f"[evaluate] loaded checkpoint at step {step}")
+        encoder = model.target_encoder  # the EMA representation
 
     # band stats from train folds (recomputed; cheap)
     train_unlab = PASTIS(data_cfg["root"], folds=data_cfg["train_folds"], return_label=False,

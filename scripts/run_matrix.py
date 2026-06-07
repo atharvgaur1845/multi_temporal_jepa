@@ -64,6 +64,8 @@ def main():
     ap.add_argument("--config", default="configs/model/tjepa.yaml")
     ap.add_argument("--data", default="configs/data/pastis.yaml")
     ap.add_argument("--out", default="runs/matrix_results.csv")
+    ap.add_argument("--ckpt-dir", default="runs/matrix",
+                    help="save each cell's encoder here so test/few-shot eval needs no retrain")
     ap.add_argument("--max-cells", type=int, default=None, help="cap cells (logs the rest as SKIPPED)")
     ap.add_argument("--device", default=None, help="override config device, e.g. cuda:1")
     ap.add_argument("--dry-run", action="store_true")
@@ -151,6 +153,13 @@ def main():
                 encoder = TRAINERS[obj](loader, cfg, device)
                 use_temporal = False
             stats = meter.stop()
+
+            # save the probed encoder (a SITSEncoder for every objective) so the final
+            # test-fold / few-shot eval can reuse it via evaluate.py --encoder-ckpt (no retrain).
+            os.makedirs(args.ckpt_dir, exist_ok=True)
+            ckpt_path = os.path.join(args.ckpt_dir, f"{name}.pt")
+            torch.save({"encoder": encoder.state_dict(), "cfg": cfg, "objective": obj,
+                        "use_temporal": use_temporal}, ckpt_path)
 
             el = DL(eval_ds, batch_size=8, collate_fn=collate_variable_length)
             tl = DL(probe_tr, batch_size=8, shuffle=True, collate_fn=collate_variable_length)
