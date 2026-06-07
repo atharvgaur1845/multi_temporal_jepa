@@ -28,6 +28,12 @@ class GpuHourMeter:
 
     def start(self) -> None:
         if torch.cuda.is_available():
+            # Ensure the target device's CUDA context exists before resetting its stats —
+            # reset_peak_memory_stats() errors ("did you call init?") if start() runs before any
+            # tensor has been placed on this device (e.g. in run_matrix, before build_model).
+            if self._device is not None:
+                torch.cuda.set_device(self._device)
+                torch.zeros(1, device=self._device)  # force context init; negligible memory
             torch.cuda.reset_peak_memory_stats(self._device)
         self._t0 = time.perf_counter()
 
