@@ -14,7 +14,8 @@ from .linear_probe import linear_probe_segmentation
 
 
 def fewshot_eval(encoder, full_train, val_loader, fractions=(0.01, 0.05, 0.10), seed=0,
-                 num_classes=20, ignore_index=19, epochs=20, batch_size=16, use_temporal=True):
+                 num_classes=20, ignore_index=19, epochs=20, batch_size=16, use_temporal=True,
+                 head="conv"):
     """For each fraction: build a stratified labeled subset, run the (frozen-encoder) probe,
     record mIoU. Returns {fraction: {"miou": ...}}.
     """
@@ -26,6 +27,6 @@ def fewshot_eval(encoder, full_train, val_loader, fractions=(0.01, 0.05, 0.10), 
                             collate_fn=collate_variable_length)
         res = linear_probe_segmentation(encoder, loader, val_loader, num_classes=num_classes,
                                         ignore_index=ignore_index, epochs=epochs,
-                                        use_temporal=use_temporal)
+                                        use_temporal=use_temporal, head=head)
         results[frac] = {"miou": res["miou"], "n_samples": len(idx)}
     return results

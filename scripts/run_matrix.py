@@ -64,6 +64,9 @@ def main():
     ap.add_argument("--max-cells", type=int, default=None, help="cap cells (logs the rest as SKIPPED)")
     ap.add_argument("--device", default=None, help="override config device, e.g. cuda:1")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--probe-epochs", type=int, default=15)
+    ap.add_argument("--knn", action="store_true", help="also record parcel k-NN per cell")
+    ap.add_argument("--test", action="store_true", help="probe on test_folds (default: val_folds)")
     args = ap.parse_args()
 
     base = load_yaml(args.config)
@@ -99,18 +102,22 @@ def main():
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
 
     msl = data_cfg.get("max_seq_len")
+    eval_folds = data_cfg["test_folds"] if args.test else data_cfg["val_folds"]
+    eval_split = "test" if args.test else "val"
+    print(f"[run_matrix] probing on {eval_split} folds {eval_folds}")
     train = PASTIS(data_cfg["root"], folds=data_cfg["train_folds"], return_label=False,
                    max_seq_len=msl, subsample_train=True)
     mean, std = compute_band_stats(train, max_samples=200)
     train.norm_mean, train.norm_std = mean, std
-    val = PASTIS(data_cfg["root"], folds=data_cfg["val_folds"], return_label=True,
-                 norm_mean=mean, norm_std=std, max_seq_len=msl)
+    eval_ds = PASTIS(data_cfg["root"], folds=eval_folds, return_label=True,
+                     norm_mean=mean, norm_std=std, max_seq_len=msl)
     probe_tr = PASTIS(data_cfg["root"], folds=data_cfg["train_folds"], return_label=True,
                       norm_mean=mean, norm_std=std, max_seq_len=msl)
 
     with open(args.out, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["cell", "objective", "miou", "gpu_hours", "peak_mem_gb"])
+        writer.writerow(["cell", "objective", "eval_split", "miou_linear", "miou_conv",
+                         "knn_acc", "gpu_hours", "peak_mem_gb"])
         from torch.utils.data import DataLoader as DL
         for name, ov in run:
             cfg = _deep_update(base, ov)
@@ -142,14 +149,30 @@ def main():
                 use_temporal = False
             stats = meter.stop()
 
-            vl = DL(val, batch_size=8, collate_fn=collate_variable_length)
+            el = DL(eval_ds, batch_size=8, collate_fn=collate_variable_length)
             tl = DL(probe_tr, batch_size=8, shuffle=True, collate_fn=collate_variable_length)
-            res = linear_probe_segmentation(encoder, tl, vl, num_classes=data_cfg["num_classes"],
-                                            ignore_index=data_cfg["ignore_index"], epochs=10,
-                                            device=device, use_temporal=use_temporal)
-            writer.writerow([name, obj, res["miou"], stats["gpu_hours"], stats["peak_mem_gb"]])
+            # both heads, matched across all methods -> linear (strict) + conv (headline) columns
+            mious = {}
+            for h in ("linear", "conv"):
+                res = linear_probe_segmentation(encoder, tl, el, num_classes=data_cfg["num_classes"],
+                                                ignore_index=data_cfg["ignore_index"],
+                                                epochs=args.probe_epochs, device=device,
+                                                use_temporal=use_temporal, head=h)
+                mious[h] = res["miou"]
+
+            knn_acc = ""
+            if args.knn:
+                from eval.knn import knn_accuracy, parcel_embeddings
+                Xtr, ytr = parcel_embeddings(encoder, tl, device=device)
+                Xev, yev = parcel_embeddings(encoder, el, device=device)
+                knn_acc = round(knn_accuracy(Xtr, ytr, Xev, yev, k=20), 4)
+
+            writer.writerow([name, obj, eval_split, round(mious["linear"], 4),
+                             round(mious["conv"], 4), knn_acc,
+                             round(stats["gpu_hours"], 3), round(stats["peak_mem_gb"], 2)])
             f.flush()
-            print(f"[run_matrix] {name}: mIoU={res['miou']:.3f} gpu_h={stats['gpu_hours']:.2f}")
+            print(f"[run_matrix] {name}: linear={mious['linear']*100:.2f} conv={mious['conv']*100:.2f} "
+                  f"knn={knn_acc} gpu_h={stats['gpu_hours']:.2f}")
 
 
 if __name__ == "__main__":

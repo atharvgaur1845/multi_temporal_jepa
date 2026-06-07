@@ -47,6 +47,7 @@ def main():
     ap.add_argument("--head", default="both", choices=["linear", "conv", "both"],
                     help="probe head: strict linear (1x1), conv decoder, or both")
     ap.add_argument("--test", action="store_true", help="evaluate on test_folds instead of val_folds")
+    ap.add_argument("--fewshot", action="store_true", help="also run 1/5/10%% few-shot probing")
     args = ap.parse_args()
 
     cfg = load_yaml(args.config)
@@ -107,6 +108,19 @@ def main():
         Xva, yva = parcel_embeddings(encoder, el, device=device)
         acc = knn_accuracy(Xtr, ytr, Xva, yva, k=20)
         print(f"[evaluate] parcel k-NN acc = {acc*100:.2f}")
+
+    if args.fewshot:
+        from eval.fewshot import fewshot_eval
+        full_train = PASTIS(data_cfg["root"], folds=data_cfg["train_folds"], return_label=True,
+                            norm_mean=mean, norm_std=std, max_seq_len=msl)
+        head = "conv" if args.head in ("conv", "both") else "linear"
+        fractions = tuple(data_cfg.get("fewshot_fractions", [0.01, 0.05, 0.10]))
+        fs = fewshot_eval(encoder, full_train, el, fractions=fractions,
+                          num_classes=data_cfg["num_classes"], ignore_index=data_cfg["ignore_index"],
+                          epochs=args.probe_epochs, use_temporal=use_temporal, head=head)
+        print(f"[evaluate] few-shot ({head} head, {split}):")
+        for frac, m in fs.items():
+            print(f"[evaluate]   {int(frac*100):>3d}% labels (n={m['n_samples']}) -> mIoU {m['miou']*100:.2f}")
 
 
 if __name__ == "__main__":
