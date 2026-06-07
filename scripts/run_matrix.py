@@ -115,6 +115,13 @@ def main():
         for name, ov in run:
             cfg = _deep_update(base, ov)
             obj = cfg["objective"]
+            # per-cell memory safety: heavy cells (large embed_dim, esp. at patch_size 8) get a
+            # smaller per-step batch with proportionally more grad_accum (effective batch held).
+            if cfg["encoder"]["embed_dim"] >= 768:
+                cfg["optim"]["batch_size"] = max(8, cfg["optim"]["batch_size"] // 2)
+                cfg["optim"]["grad_accum"] = cfg["optim"]["grad_accum"] * 2
+                print(f"[run_matrix] {name}: embed>=768 -> batch {cfg['optim']['batch_size']}, "
+                      f"accum {cfg['optim']['grad_accum']} (memory safety)")
             seed_everything(cfg["log"].get("seed", 0))
             loader = DataLoader(train, batch_size=cfg["optim"]["batch_size"], shuffle=True,
                                 num_workers=8, collate_fn=collate_variable_length, drop_last=True)

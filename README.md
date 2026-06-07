@@ -49,7 +49,7 @@ Full server command reference is in **§7**.
 PASTIS series X[T,10,128,128] + DOY dates d[T]
    │  causal split by date  →  context = past frames | target = future frame (gap = horizon Δ)
    ▼
-per-frame PatchEmbed (Conv 10→D, P=16 → 8×8=64 tokens/frame) + 2D spatial pos + DOY temporal pos
+per-frame PatchEmbed (Conv 10→D, P=8 → 16×16=256 tokens/frame) + 2D spatial pos + DOY temporal pos
    ├─► CONTEXT path:  spatial ViT (per frame) → temporal transformer (past frames) → z_ctx
    │                                                              │
    │                         PREDICTOR (narrow, 384 < encoder 512): z_ctx + mask tokens(future pos/DOY)
@@ -126,7 +126,8 @@ tests/        unit tests (TDD); test_model_synthetic runs the full wiring withou
 
 ### `models/`
 - **`patch_embed.py`** — `Conv2d(10→D, kernel=stride=P)` patchify+project in one op; exposes
-  `grid_hw` and `num_patches`. Input is 10-channel (not 3).
+  `grid_hw` and `num_patches`. Input is 10-channel (not 3). At `P=8` → 16×16=256 tokens/frame
+  (default, for dense mIoU); `P=16` → 8×8=64 (cheaper, coarser).
 - **`pos_embed.py`** — `build_2d_sincos_pos_embed` (fixed 2D sin/cos over the token grid);
   `doy_sincos_pos_embed` (sin/cos with phase `DOY/366·2π`, **periodic over a year**; zeros out
   padded frames). DOY encoding is what makes "Δ acquisitions" carry real elapsed time.
@@ -197,7 +198,9 @@ tests/        unit tests (TDD); test_model_synthetic runs the full wiring withou
   uses the temporal encoder (JEPA cells); `use_temporal=False` is spatial-only per frame (the
   baselines, whose temporal encoder is untrained — fair eval). Then trains a single `1×1` conv
   head and reports **mIoU** (dense, per-pixel — not global top-1). `miou_from_confusion` handles
-  the ignore class.
+  the ignore class. `head=` selects `'linear'` (strict 1×1 probe) or `'conv'` (a small 2-layer
+  conv decoder — fairer dense readout from coarse upsampled tokens); `scripts/evaluate.py --head
+  both` reports each. `_sanitize_labels` maps out-of-range/void labels to `ignore_index`.
 - **`knn.py`** — `parcel_embeddings` (masked-mean feature + dominant label per patch) and
   `knn_accuracy` (cosine k-NN, majority vote). Training-free probe.
 - **`fewshot.py`** — `fewshot_eval` runs the linear probe on stratified 1/5/10% label subsets.
@@ -234,19 +237,25 @@ tests/        unit tests (TDD); test_model_synthetic runs the full wiring withou
   set to 0 for pure I-JEPA); optimizer (AdamW, warmup→cosine LR, cosine wd ramp, flip `augment`,
   AMP, grad-accum).
 
-**GPU / memory (tuned for a 15–16 GB card).** Defaults use the full temporal sequence and a
-healthy batch: `embed_dim 512`, `max_seq_len 61`, `batch_size 48`, `grad_accum 4`,
-`grad_checkpoint: true` → **est. peak ≈ 11 GB** (calibrated from on-GPU measurements; batch 56
-≈ 13 GB, batch 64 ≈ 14.5 GB). The levers, in order of impact:
-- **`encoder.grad_checkpoint: true`** — recompute activations in backward; the big cut (~3× less
-  memory, what makes full 61-frame sequences affordable). Costs ~25% wall-clock; with only ~11 GB
-  used you have room, but full frames at embed 512 need it.
-- **`data.max_seq_len`** (61 = all PASTIS acquisitions; best for the temporal method). Lower to
-  32 to roughly halve memory on a smaller card. `B×T` frames flow through the spatial ViT.
+**GPU / memory (tuned for a 15–16 GB card, at patch_size 8).** Defaults: `patch_size 8`
+(256 tokens/frame — for good DENSE mIoU), `embed_dim 512`, `max_seq_len 32`, `batch_size 32`,
+`grad_accum 6`, `grad_checkpoint: true` → **est. peak ≈ 10.8 GB** (calibrated model
+`mem ≈ 0.0096·B·T + 0.95 GB`; batch 40 ≈ 13 GB). The levers, in order of impact:
+- **`encoder.patch_size`** — 8 = 256 tokens (4× finer, 4× heavier; the dense-mIoU lever); 16 = 64
+  tokens (cheap/coarse — fine for capacity ablations where resolution doesn't matter).
+- **`encoder.grad_checkpoint: true`** — recompute activations in backward (~3× less memory).
+  Required at P8. Costs ~25% wall-clock.
+- **`data.max_seq_len`** (32) — `B×T` frames flow through the spatial ViT; raise toward 48/61 only
+  if you drop `patch_size` or `batch_size`.
 - **`optim.batch_size` / `optim.grad_accum`** — per-step `batch_size` sets memory; `grad_accum`
-  raises the *effective* batch for **free** (grads accumulate). Default 48×4 = effective 192;
-  raise `batch_size` to 56 (~13 GB) if `nvidia-smi` shows headroom. Drop `embed_dim` to 256
-  (predictor auto-clamps) for another large saving if needed.
+  raises the *effective* batch for **free**. Default 32×6 = effective 192. `run_matrix` auto-halves
+  the batch (doubling accum) for the heavy `embed_dim 768` ablation cell so the sweep can't OOM.
+
+**Compute reality (read before launching the full matrix).** P8 is ~4× the compute of P16. One
+P16 cell took ~4 GPU-h (100 epochs); a P8 cell is **roughly a day**. The 16-cell matrix at P8 is
+GPU-*weeks*. Scope deliberately: run the 5 main objective cells + horizon study at P8, and either
+keep the capacity ablations (embed_dim / predictor-depth) at `patch_size 16` or cut epochs — the
+ablations show *trends*, which resolution doesn't change. `--max-cells` caps and logs the rest.
 
 ---
 

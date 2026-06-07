@@ -44,6 +44,8 @@ def main():
     ap.add_argument("--probe-epochs", type=int, default=20)
     ap.add_argument("--probe-batch", type=int, default=8)
     ap.add_argument("--knn", action="store_true", help="also run parcel k-NN")
+    ap.add_argument("--head", default="both", choices=["linear", "conv", "both"],
+                    help="probe head: strict linear (1x1), conv decoder, or both")
     ap.add_argument("--test", action="store_true", help="evaluate on test_folds instead of val_folds")
     args = ap.parse_args()
 
@@ -86,14 +88,18 @@ def main():
     print(f"[evaluate] feature health: per_dim_std={diag['per_dim_std']:.3f} "
           f"effective_rank={diag['effective_rank']:.1f} offdiag_cov={diag['offdiag_cov']:.4f}")
 
-    # linear probe -> mIoU
-    res = linear_probe_segmentation(encoder, tl, el, num_classes=data_cfg["num_classes"],
-                                    ignore_index=data_cfg["ignore_index"], epochs=args.probe_epochs,
-                                    device=device, use_temporal=use_temporal)
+    # probe -> mIoU (one or both heads)
     split = "test" if args.test else "val"
+    heads = ["linear", "conv"] if args.head == "both" else [args.head]
     print(f"\n[evaluate] === RESULT ({split}) ===")
-    print(f"[evaluate] linear-probe mIoU = {res['miou']*100:.2f}   (U-TAE supervised ref = 63.1)")
-    print(f"[evaluate] per-class IoU = {[round(float(x), 3) for x in res['per_class_iou']]}")
+    for h in heads:
+        res = linear_probe_segmentation(encoder, tl, el, num_classes=data_cfg["num_classes"],
+                                        ignore_index=data_cfg["ignore_index"],
+                                        epochs=args.probe_epochs, device=device,
+                                        use_temporal=use_temporal, head=h)
+        print(f"[evaluate] {h:6s} mIoU = {res['miou']*100:.2f}   (U-TAE supervised ref = 63.1)")
+        if h == heads[-1]:
+            print(f"[evaluate] per-class IoU = {[round(float(x), 3) for x in res['per_class_iou']]}")
 
     if args.knn:
         from eval.knn import knn_accuracy, parcel_embeddings

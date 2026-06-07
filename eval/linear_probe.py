@@ -68,13 +68,25 @@ def _sanitize_labels(label, num_classes, ignore_index):
                        torch.full_like(label, ignore_index))
 
 
+def _build_head(D, num_classes, head):
+    """Probe head. 'linear' = 1x1 conv (the strict linear-probe convention). 'conv' = a small
+    2-layer conv decoder (3x3 -> GELU -> 1x1) — a fairer DENSE readout that sharpens the coarse
+    upsampled token features. Report which one you used."""
+    if head == "linear":
+        return nn.Conv2d(D, num_classes, 1)
+    if head == "conv":
+        return nn.Sequential(nn.Conv2d(D, 256, 3, padding=1), nn.GELU(),
+                             nn.Conv2d(256, num_classes, 1))
+    raise ValueError(f"unknown head {head!r}")
+
+
 def linear_probe_segmentation(encoder, train_loader, val_loader, num_classes=20,
                               ignore_index=19, epochs=20, lr=1e-3, device=None,
-                              use_temporal=True):
-    """Freeze encoder; train a 1x1-conv head -> per-pixel logits; report mIoU.
+                              use_temporal=True, head="linear"):
+    """Freeze encoder; train a probe head -> per-pixel logits; report mIoU.
 
     use_temporal selects the feature pathway (see extract_dense_features): True for JEPA,
-    False for spatial-only baselines.
+    False for spatial-only baselines. head: 'linear' (strict probe) or 'conv' (light decoder).
 
     Returns: dict(miou=..., per_class_iou=tensor).
     """
@@ -87,7 +99,7 @@ def linear_probe_segmentation(encoder, train_loader, val_loader, num_classes=20,
     sample = next(iter(train_loader))
     sample = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in sample.items()}
     D = extract_dense_features(encoder, sample, use_temporal=use_temporal).shape[1]
-    head = nn.Conv2d(D, num_classes, 1).to(device)
+    head = _build_head(D, num_classes, head).to(device)
     opt = torch.optim.AdamW(head.parameters(), lr=lr)
 
     for ep in range(epochs):

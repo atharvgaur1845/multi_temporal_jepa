@@ -12,8 +12,9 @@ val_folds: [4]
 test_folds: [5]
 
 # temporal handling
-max_seq_len: 61                    # full PASTIS temporal range (38..61) — best for the temporal
-                                   # method. Lower (e.g. 32) to save memory on a smaller card.
+max_seq_len: 32                    # frames/series. At patch_size 8 (256 tokens/frame) full 61 is
+                                   # too heavy; 32 keeps horizon Δ≤8 valid and ~halves compute.
+                                   # Raise toward 48/61 only if you also drop patch_size or batch.
 date_encoding: doy                 # day-of-year (irregular cadence!) — NOT integer index
 
 # normalization: per-band mean/std — TODO compute from train folds (see data/transforms.py)

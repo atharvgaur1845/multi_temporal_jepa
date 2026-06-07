@@ -3,12 +3,13 @@ objective: temporal_jepa           # one of: temporal_jepa | spatial_jepa | mae 
 device: cuda                       # SINGLE GPU knob: cuda | cuda:1 | cuda:2 | cpu (or --device)
 
 encoder:
-  patch_size: 16                   # 128/16 = 8x8 = 64 tokens/frame  (P=8 -> 256 tokens is an ablation)
+  patch_size: 8                    # 128/8 = 16x16 = 256 tokens/frame (4x finer than P16 -> much
+                                   # better DENSE mIoU; P16 = 64 tokens is the cheap/coarse option)
   embed_dim: 512                   # ablation grid: {128, 256, 512, 768}
   depth: 6                         # spatial ViT depth
   num_heads: 8                     # head_dim = 512/8 = 64
   temporal_depth: 4                # factorized temporal transformer depth
-  grad_checkpoint: true            # recompute activations in backward -> big memory cut (~25% slower)
+  grad_checkpoint: true            # REQUIRED at P8 — recompute activations in backward
 
 predictor:
   # MUST be narrower than encoder.embed_dim — the asymmetry bottleneck is half the anti-collapse
@@ -46,10 +47,10 @@ optim:
   weight_decay_end: 0.40
   epochs: 100
   # Memory: per-step batch is the lever; grad_accum raises the EFFECTIVE batch for FREE (grads
-  # accumulate, no extra memory). Defaults below target a ~15-16 GB card at embed_dim 512 +
-  # grad_checkpoint + full max_seq_len 61: est peak ~11 GB at batch 48 (batch 56 ~13 GB, 64 ~14.5).
-  batch_size: 48                   # ~11 GB; raise to 56 (~13 GB) if nvidia-smi shows headroom
-  grad_accum: 4                    # effective batch = batch_size * grad_accum = 192
+  # accumulate, no extra memory). Calibrated for ~15-16 GB at patch_size 8 + embed 512 +
+  # grad_checkpoint + max_seq_len 32: est peak ~10.8 GB at batch 32 (model: 0.0096*B*T + 0.95).
+  batch_size: 32                   # ~10.8 GB at P8/T32; raise to 40 (~13 GB) if nvidia-smi shows room
+  grad_accum: 6                    # effective batch = batch_size * grad_accum = 192
   amp: true
   augment: true                    # random H/V flips during pretraining (label-free)
   # weight_decay is cosine-ramped weight_decay_start -> weight_decay_end over training.

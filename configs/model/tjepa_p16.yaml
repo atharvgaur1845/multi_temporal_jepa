@@ -1,0 +1,53 @@
+# P16 config — matches the FIRST pilot checkpoint (patch_size 16). Use this ONLY to evaluate the
+# existing runs/tjepa/last.ckpt that was trained before the switch to patch_size 8:
+#   python scripts/evaluate.py --config configs/model/tjepa_p16.yaml --ckpt runs/tjepa/last.ckpt \
+#       --device cuda:2 --head both --knn
+# For the new solid-base runs use configs/model/tjepa.yaml (patch_size 8).
+objective: temporal_jepa
+device: cuda
+
+encoder:
+  patch_size: 16                   # 8x8 = 64 tokens/frame (the pilot's coarse setting)
+  embed_dim: 512
+  depth: 6
+  num_heads: 8
+  temporal_depth: 4
+  grad_checkpoint: true
+
+predictor:
+  embed_dim: 384
+  depth: 6
+  num_heads: 12
+
+ema:
+  base_momentum: 0.996
+  final_momentum: 1.0
+  schedule: linear
+
+temporal:
+  horizon: 1
+  min_context: 4
+
+loss:
+  type: l2
+  target_layernorm: true
+  stop_grad: true
+  var_coeff: 1.0
+  cov_coeff: 0.04
+
+optim:
+  name: adamw
+  lr: 1.0e-3
+  warmup_epochs: 15
+  min_lr: 1.0e-6
+  weight_decay_start: 0.04
+  weight_decay_end: 0.40
+  epochs: 100
+  batch_size: 48
+  grad_accum: 4
+  amp: true
+  augment: true
+
+log:
+  diagnostics_every: 50
+  seed: 0
