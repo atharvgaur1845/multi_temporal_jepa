@@ -153,7 +153,7 @@ def main(config_path, data_config_path, device=None):
     out_dir = cfg.get("out_dir", "runs/tjepa")
     os.makedirs(out_dir, exist_ok=True)
 
-    meter = GpuHourMeter(); meter.start()
+    meter = GpuHourMeter(device); meter.start()
     step = 0
     for ep in range(epochs):
         step = train_one_epoch(model, loader, optimizer, scaler, cfg, step, total_steps, device)

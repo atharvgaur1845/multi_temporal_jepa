@@ -118,7 +118,7 @@ def main():
             seed_everything(cfg["log"].get("seed", 0))
             loader = DataLoader(train, batch_size=cfg["optim"]["batch_size"], shuffle=True,
                                 num_workers=8, collate_fn=collate_variable_length, drop_last=True)
-            meter = GpuHourMeter(); meter.start()
+            meter = GpuHourMeter(device); meter.start()
 
             if obj in ("temporal_jepa", "spatial_jepa"):
                 model = build_model(cfg).to(device)
