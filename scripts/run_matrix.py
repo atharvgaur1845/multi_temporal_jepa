@@ -28,15 +28,18 @@ from utils.config import load_yaml  # noqa: E402
 
 
 def enumerate_cells():
-    """Yield (name, overrides) cells for the full matrix. Overrides patch the base tjepa config."""
+    """Yield (name, overrides) cells, FRONT-LOADED by importance so --max-cells gets the headline
+    result first. Order: (1) main equal-compute comparison [temporal h1 vs spatial vs baselines],
+    (2) horizon study, (3) ablations. Overrides patch the base tjepa config."""
     cells = []
-    # horizon study (temporal jepa)
-    for h in (1, 2, 4, 8):
-        cells.append((f"tjepa_h{h}", {"objective": "temporal_jepa", "temporal": {"horizon": h}}))
-    # baselines
+    # 1) MAIN COMPARISON (the contribution) — temporal@h1 vs spatial JEPA vs MAE/BYOL/SimCLR.
+    cells.append(("tjepa_h1", {"objective": "temporal_jepa", "temporal": {"horizon": 1}}))
     for obj in ("spatial_jepa", "mae", "byol", "simclr"):
         cells.append((obj, {"objective": obj}))
-    # ablations: predictor depth + embed dim (temporal jepa, horizon 1)
+    # 2) horizon study (h1 already covered above)
+    for h in (2, 4, 8):
+        cells.append((f"tjepa_h{h}", {"objective": "temporal_jepa", "temporal": {"horizon": h}}))
+    # 3) ablations: predictor depth + embed dim (temporal jepa, horizon 1)
     for d in (1, 2, 4, 6):
         cells.append((f"tjepa_preddepth{d}",
                       {"objective": "temporal_jepa", "predictor": {"depth": d}}))
