@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import copy
 import csv
+import gc
 import os
 import sys
 
@@ -148,10 +149,18 @@ def main():
                 step = 0
                 for _ in range(cfg["optim"]["epochs"]):
                     step = train_one_epoch(model, loader, opt, scaler, cfg, step, total, device)
+                # keep only the encoder we probe; free the JEPA wrapper + optimizer states so the
+                # probe runs at max(train, probe) memory, not train + probe.
+                model.context_encoder = None
+                model.predictor = None
                 encoder, use_temporal = model.target_encoder, True
+                del model, opt, scaler
             else:  # mae / byol / simclr — spatial-only backbone, probed without temporal encoder
                 encoder = TRAINERS[obj](loader, cfg, device)
                 use_temporal = False
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             stats = meter.stop()
 
             # save the probed encoder (a SITSEncoder for every objective) so the final
@@ -185,6 +194,12 @@ def main():
             f.flush()
             print(f"[run_matrix] {name}: linear={mious['linear']*100:.2f} conv={mious['conv']*100:.2f} "
                   f"knn={knn_acc} gpu_h={stats['gpu_hours']:.2f}")
+
+            # release everything before the next cell so memory doesn't accumulate across cells
+            del encoder, loader, tl, el
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":
