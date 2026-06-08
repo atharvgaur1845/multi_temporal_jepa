@@ -1,0 +1,19 @@
+# Laptop pilot data config — same PASTIS, fewer frames/series to cut compute on a small GPU.
+name: pastis
+root: ./data_root/PASTIS
+bands: 10
+patch_size_px: 128
+num_classes: 20                    # 0=background, 1..18 crops, 19=void
+ignore_index: 19
+folds: [1, 2, 3, 4, 5]
+train_folds: [1, 2, 3]
+val_folds: [4]
+test_folds: [5]
+
+max_seq_len: 24                    # fewer acquisitions than server (32) -> faster on a laptop
+date_encoding: doy
+
+norm_mean: null
+norm_std: null
+
+fewshot_fractions: [0.01, 0.05, 0.10]

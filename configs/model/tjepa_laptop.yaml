@@ -1,0 +1,52 @@
+# Laptop / small-GPU pilot config (e.g. RTX 4060 8 GB). Goal: validate the temporal-vs-baselines
+# comparison on REAL PASTIS while a bigger GPU is busy — NOT publication-grade numbers.
+# vs the server config: smaller encoder (256 not 512), fewer epochs (50 not 100). Keeps P8 (good
+# dense resolution). Measured peak ~3-4 GB; trains in hours/cell on a 4060 (server is much faster).
+objective: temporal_jepa
+device: cuda                       # or --device cuda:0
+
+encoder:
+  patch_size: 8                    # keep fine resolution (memory is not the limit here)
+  embed_dim: 256                   # half the server width -> ~4x less compute
+  depth: 6
+  num_heads: 8                     # head_dim 32
+  temporal_depth: 4
+  grad_checkpoint: true
+
+predictor:
+  embed_dim: 128                   # narrower than encoder (256) — the asymmetry bottleneck
+  depth: 4
+  num_heads: 4                     # head_dim 32
+
+ema:
+  base_momentum: 0.996
+  final_momentum: 1.0
+  schedule: linear
+
+temporal:
+  horizon: 1
+  min_context: 4
+
+loss:
+  type: l2
+  target_layernorm: true
+  stop_grad: true
+  var_coeff: 1.0
+  cov_coeff: 0.04
+
+optim:
+  name: adamw
+  lr: 1.0e-3
+  warmup_epochs: 8
+  min_lr: 1.0e-6
+  weight_decay_start: 0.04
+  weight_decay_end: 0.40
+  epochs: 50                       # fewer than server (100) to keep laptop runtime sane
+  batch_size: 24                   # ~3-4 GB; plenty of headroom on 8 GB
+  grad_accum: 8                    # effective batch = 192
+  amp: true
+  augment: true
+
+log:
+  diagnostics_every: 50
+  seed: 0
