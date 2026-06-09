@@ -73,6 +73,8 @@ def main():
     ap.add_argument("--probe-epochs", type=int, default=15)
     ap.add_argument("--knn", action="store_true", help="also record parcel k-NN per cell")
     ap.add_argument("--test", action="store_true", help="probe on test_folds (default: val_folds)")
+    ap.add_argument("--resume", action="store_true",
+                    help="skip cells whose encoder ckpt already exists (continue after a crash)")
     args = ap.parse_args()
 
     base = load_yaml(args.config)
@@ -120,12 +122,18 @@ def main():
     probe_tr = PASTIS(data_cfg["root"], folds=data_cfg["train_folds"], return_label=True,
                       norm_mean=mean, norm_std=std, max_seq_len=msl)
 
-    with open(args.out, "w", newline="") as f:
+    resume_existing = args.resume and os.path.exists(args.out)
+    with open(args.out, "a" if resume_existing else "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["cell", "objective", "eval_split", "miou_linear", "miou_conv",
-                         "knn_acc", "gpu_hours", "peak_mem_gb"])
+        if not resume_existing:
+            writer.writerow(["cell", "objective", "eval_split", "miou_linear", "miou_conv",
+                             "knn_acc", "gpu_hours", "peak_mem_gb"])
         from torch.utils.data import DataLoader as DL
         for name, ov in run:
+            ckpt_path = os.path.join(args.ckpt_dir, f"{name}.pt")
+            if args.resume and os.path.exists(ckpt_path):
+                print(f"[run_matrix] {name}: already complete ({ckpt_path}) -> resume skip")
+                continue
             cfg = _deep_update(base, ov)
             obj = cfg["objective"]
             # per-cell memory safety: heavy cells (large embed_dim, esp. at patch_size 8) get a
@@ -163,13 +171,6 @@ def main():
                 torch.cuda.empty_cache()
             stats = meter.stop()
 
-            # save the probed encoder (a SITSEncoder for every objective) so the final
-            # test-fold / few-shot eval can reuse it via evaluate.py --encoder-ckpt (no retrain).
-            os.makedirs(args.ckpt_dir, exist_ok=True)
-            ckpt_path = os.path.join(args.ckpt_dir, f"{name}.pt")
-            torch.save({"encoder": encoder.state_dict(), "cfg": cfg, "objective": obj,
-                        "use_temporal": use_temporal}, ckpt_path)
-
             el = DL(eval_ds, batch_size=8, collate_fn=collate_variable_length)
             tl = DL(probe_tr, batch_size=8, shuffle=True, collate_fn=collate_variable_length)
             # both heads, matched across all methods -> linear (strict) + conv (headline) columns
@@ -192,6 +193,11 @@ def main():
                              round(mious["conv"], 4), knn_acc,
                              round(stats["gpu_hours"], 3), round(stats["peak_mem_gb"], 2)])
             f.flush()
+            # save encoder LAST so its presence means the cell is FULLY done (train+probe+logged)
+            # -> --resume can safely skip it on a re-run after a crash/OOM.
+            os.makedirs(args.ckpt_dir, exist_ok=True)
+            torch.save({"encoder": encoder.state_dict(), "cfg": cfg, "objective": obj,
+                        "use_temporal": use_temporal}, os.path.join(args.ckpt_dir, f"{name}.pt"))
             print(f"[run_matrix] {name}: linear={mious['linear']*100:.2f} conv={mious['conv']*100:.2f} "
                   f"knn={knn_acc} gpu_h={stats['gpu_hours']:.2f}")
 

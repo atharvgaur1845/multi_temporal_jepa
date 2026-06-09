@@ -22,7 +22,8 @@ def _new_backbone(cfg, device):
     enc = cfg["encoder"]
     return SITSEncoder(patch_size=enc["patch_size"], embed_dim=enc["embed_dim"],
                        depth=enc["depth"], num_heads=enc["num_heads"],
-                       temporal_depth=enc.get("temporal_depth", 4)).to(device)
+                       temporal_depth=enc.get("temporal_depth", 4),
+                       grad_checkpoint=enc.get("grad_checkpoint", False)).to(device)
 
 
 def _two_views(batch):
