@@ -40,13 +40,21 @@ def _two_views(batch):
     return v1, v2
 
 
-def _pool_global(backbone, batch):
+def _pool_global(backbone, batch, frame_chunk=64):
     """Global embedding (B, D): spatial-encode each real frame, mean over tokens, masked-mean
-    over time. Spatial-only (matches the probe's use_temporal=False pathway)."""
+    over time. Spatial-only (matches the probe's use_temporal=False pathway).
+
+    Frames are encoded in CHUNKS of `frame_chunk` so peak memory is bounded by one chunk, not by
+    B*T (which is huge for BYOL: two backbones x two views). With gradient checkpointing on, the
+    autograd graph keeps only the small per-frame embeddings, so this caps memory without changing
+    the effective batch or the result.
+    """
     data, pad_mask = batch["data"], batch["pad_mask"]
     B, T = data.shape[:2]
     flat = data.reshape(B * T, *data.shape[2:])
-    tok = backbone.encode_full(flat).mean(dim=1).reshape(B, T, backbone.embed_dim)  # (B,T,D)
+    chunks = [backbone.encode_full(flat[i:i + frame_chunk]).mean(dim=1)
+              for i in range(0, flat.shape[0], frame_chunk)]
+    tok = torch.cat(chunks, dim=0).reshape(B, T, backbone.embed_dim)                 # (B,T,D)
     m = pad_mask.float()[:, :, None]
     return (tok * m).sum(dim=1) / m.sum(dim=1).clamp_min(1.0)                        # (B, D)
 
