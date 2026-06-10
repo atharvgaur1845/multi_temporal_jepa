@@ -133,7 +133,8 @@ def main():
         fractions = tuple(data_cfg.get("fewshot_fractions", [0.01, 0.05, 0.10]))
         fs = fewshot_eval(encoder, full_train, el, fractions=fractions,
                           num_classes=data_cfg["num_classes"], ignore_index=data_cfg["ignore_index"],
-                          epochs=args.probe_epochs, use_temporal=use_temporal, head=head)
+                          epochs=args.probe_epochs, use_temporal=use_temporal, head=head,
+                          device=device)
         print(f"[evaluate] few-shot ({head} head, {split}):")
         for frac, m in fs.items():
             print(f"[evaluate]   {int(frac*100):>3d}% labels (n={m['n_samples']}) -> mIoU {m['miou']*100:.2f}")
