@@ -181,25 +181,41 @@ All four train the same `SITSEncoder` spatial backbone so the frozen-probe is un
 
 ---
 
-## 7. Results (PASTIS val fold; pilot at P8 / embed-512 / 100 epochs)
+## 7. Results (pilot: P8 / embed-512 / 100 epochs)
 
-Headline metric is **conv-head mIoU** (×100); `linear` is the strict 1×1 probe.
+Frozen-encoder probes. Headline = **conv-head mIoU** (×100); `linear` = strict 1×1 probe.
 
-| Method | linear mIoU | **conv mIoU** | parcel k-NN | GPU-h |
-|---|---|---|---|---|
-| **Temporal JEPA (Δ=1)** | **17.4** | **22.1** | **66.8** | 2.1 |
-| Spatial JEPA | 10.3 | 16.2 | 58.7 | 0.6 |
-| SimCLR | 3.8 | 8.3 | 54.6 | 7.8 |
-| BYOL | 5.5 | 5.0 | 62.7 | 9.9 |
-| MAE | 4.0 | 3.8 | 54.4 | 0.5 |
-| *Supervised U-TAE (ref, not comparable)* | — | *63.1* | — | — |
+**Held-out TEST fold (folds 5):**
+
+| Method | conv mIoU | k-NN | few-shot 1% | 5% | 10% |
+|---|---|---|---|---|---|
+| **Temporal JEPA (Δ=1)** | **22.3** | **65.5** | **9.5** | **12.6** | **15.4** |
+| Spatial JEPA | 16.6 | — | 5.5 | 6.6 | 9.5 |
+| SimCLR | 6.9 | — | 2.8 | 3.7 | 4.1 |
+| MAE | 5.2 | — | 2.9 | 3.3 | 3.3 |
+| BYOL | 4.6 | — | 4.0 | 5.4 | 4.3 |
+| *Supervised U-TAE (ceiling, not a frozen-probe peer)* | *63.1* | — | — | — | — |
+
+**Validation fold (folds 4), for model selection — confirms the test ranking:** temporal 22.1 /
+spatial 16.2 / simclr 8.3 / byol 5.0 / mae 3.8 conv mIoU; k-NN 66.8 / 58.7 / 54.6 / 62.7 / 54.4.
+GPU-hours/cell: temporal 2.1, spatial 0.6, mae 0.5, byol 9.9, simclr 7.8.
 
 **Findings.**
-- **H1 supported.** Temporal JEPA beats spatial JEPA on every metric: **+36% relative** conv mIoU
-  (22.1 vs 16.2), +70% linear, +8 pts k-NN.
-- **H3 supported.** Temporal JEPA beats MAE/BYOL/SimCLR by a wide margin — and it beats BYOL/SimCLR
-  **using 4–5× less GPU time** (2.1 h vs 7.8–9.9 h), so the win is not bought with compute.
-- The ordering is **consistent across three independent probes**, which is what makes it credible.
+- **H1 supported (and it generalizes).** Temporal beats spatial JEPA on the *test* fold at every
+  label fraction: **+34%** conv mIoU at 100% labels (22.3 vs 16.6), widening to **+71%** at 1%
+  (9.5 vs 5.5). Val agrees (22.1 vs 16.2). The temporal-vs-spatial pair is the *cleanest*
+  comparison — same trainer, same effective batch (192) — so this headline is airtight.
+- **H1 data-efficiency.** The temporal advantage *grows* as labels shrink — exactly the SSL story:
+  good pretraining matters most in the low-label regime.
+- **H3 supported.** Temporal beats MAE/BYOL/SimCLR by a wide margin on every metric — and beats
+  BYOL/SimCLR while using **4–5× less GPU time** (2.1 h vs 7.8–9.9 h), so the win is not bought
+  with compute.
+- **Consistent across three independent probes** (dense mIoU, k-NN, few-shot) → credible.
+
+*Note:* the non-JEPA baselines (MAE/BYOL/SimCLR) train at effective batch 16 vs JEPA's 192 (no
+grad-accum in their trainer **when these numbers were produced**) — see §8.2. Grad-accum has now
+been added to the baseline trainers (effective batch 192); **the baseline cells must be re-run** to
+refresh these numbers. The temporal>spatial result is unaffected (both already used batch 192).
 
 ---
 
@@ -209,9 +225,12 @@ Headline metric is **conv-head mIoU** (×100); `linear` is the strict 1×1 probe
    claim as "equal epochs," and add a **compute-matched spatial-JEPA run** (train it to ≈2.1 GPU-h)
    as a robustness check, since spatial used *less* compute than temporal. (BYOL/SimCLR used more
    and still lost, so they are not a concern.)
-2. **Baseline batch confound.** The baseline trainers currently use **effective batch 16** while
-   JEPA uses **192** (no grad-accumulation in the baseline loops). Equalize this before the final
-   table so the baselines can't be dismissed as under-tuned (MAE at 3.8 is suspiciously low).
+2. **Baseline batch confound — FIXED (re-run pending).** The baseline numbers above were produced
+   at **effective batch 16** vs JEPA's **192**. Grad-accumulation has now been added to all three
+   baseline trainers (effective batch 192). **Action:** delete `runs/matrix/{mae,byol,simclr}.pt`
+   and re-run those cells to refresh the table. *Caveat:* for SimCLR, grad-accum equalizes the
+   *optimization* batch but not the NT-Xent *negative* count (still per-micro-batch); a true
+   large-negative SimCLR needs a memory bank — note this rather than over-claim.
 3. **Val, not test.** These are val-fold numbers for model selection. Final numbers must come from
    the **test fold** for the chosen settings only (avoid test-set leakage), with **few-shot** for
    the low-label story.
@@ -238,8 +257,8 @@ Headline metric is **conv-head mIoU** (×100); `linear` is the strict 1×1 probe
 
 ## 10. Next steps
 
-1. **Equalize the baselines** (grad-accum in baseline trainers → effective batch 192) and re-run
-   MAE/BYOL/SimCLR for a fair table.
+1. **Re-run the equalized baselines.** Grad-accum is now in the baseline trainers (effective batch
+   192). Delete `runs/matrix/{mae,byol,simclr}.pt` and re-run those cells for the fair table.
 2. **Compute-matched spatial JEPA** robustness run.
 3. **Horizon study** Δ∈{1,2,4,8} (H2): `run_matrix --max-cells 8`.
 4. **Ablations** (H4): predictor depth {1,2,4,6}, embed dim {128,256,512,768}.

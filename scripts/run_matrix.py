@@ -37,6 +37,11 @@ def enumerate_cells():
     cells.append(("tjepa_h1", {"objective": "temporal_jepa", "temporal": {"horizon": 1}}))
     for obj in ("spatial_jepa", "mae", "byol", "simclr"):
         cells.append((obj, {"objective": obj}))
+    # 1b) COMPUTE-MATCHED spatial JEPA robustness check: spatial uses ~3.5x less GPU-time/epoch
+    #     than temporal (1 frame vs full context), so train it ~3.5x longer to match wall-clock and
+    #     show temporal's win isn't just "more compute". Tune epochs to your card's GPU-h.
+    cells.append(("spatial_jepa_matched",
+                  {"objective": "spatial_jepa", "optim": {"epochs": 350}}))
     # 2) horizon study (h1 already covered above)
     for h in (2, 4, 8):
         cells.append((f"tjepa_h{h}", {"objective": "temporal_jepa", "temporal": {"horizon": h}}))

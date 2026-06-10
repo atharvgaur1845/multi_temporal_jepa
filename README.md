@@ -12,18 +12,22 @@ masked-region prediction) and reconstruction/contrastive baselines (MAE, BYOL, S
 **For the full write-up** (hypothesis, method, what differs from I-JEPA, protocol, results,
 caveats) see **[report.md](report.md)**. This README is the engineering reference.
 
-## Headline result (PASTIS val, P8 / embed-512 / 100 epochs)
+## Headline result (PASTIS held-out TEST fold, P8 / embed-512 / 100 epochs)
 
-| Method | conv mIoU | linear mIoU | parcel k-NN |
+| Method | conv mIoU | k-NN | few-shot 1% / 5% / 10% |
 |---|---|---|---|
-| **Temporal JEPA (Δ=1)** | **22.1** | **17.4** | **66.8** |
-| Spatial JEPA | 16.2 | 10.3 | 58.7 |
-| SimCLR | 8.3 | 3.8 | 54.6 |
-| BYOL | 5.0 | 5.5 | 62.7 |
-| MAE | 3.8 | 4.0 | 54.4 |
+| **Temporal JEPA (Δ=1)** | **22.3** | **65.5** | **9.5 / 12.6 / 15.4** |
+| Spatial JEPA | 16.6 | 58.7* | 5.5 / 6.6 / 9.5 |
+| SimCLR | 6.9 | 54.6* | 2.8 / 3.7 / 4.1 |
+| MAE | 5.2 | 54.4* | 2.9 / 3.3 / 3.3 |
+| BYOL | 4.6 | 62.7* | 4.0 / 5.4 / 4.3 |
 
-Temporal JEPA wins on every metric (+36% conv mIoU over spatial JEPA) — consistent across three
-independent probes. (Supervised U-TAE = 63.1 is the end-to-end ceiling, not a frozen-probe peer.)
+Temporal JEPA wins at **every label fraction**; the gap over spatial JEPA *widens* from +34% (full
+labels) to **+71% at 1% labels** — the SSL data-efficiency story. Consistent across three
+independent probes (dense mIoU, k-NN, few-shot), and it generalizes from val to test. (*k-NN shown
+from the val fold. Supervised U-TAE = 63.1 is the end-to-end ceiling, not a frozen-probe peer.
+MAE/BYOL/SimCLR train at effective batch 16 vs JEPA's 192 — see report.md §8.) Full analysis in
+**[report.md](report.md)**.
 
 ---
 

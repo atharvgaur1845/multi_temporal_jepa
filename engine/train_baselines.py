@@ -81,8 +81,10 @@ def train_byol(loader, cfg, device, logger=print):
 
     opt = _opt(list(online.parameters()) + list(proj_o.parameters()) + list(pred_o.parameters()), cfg)
     epochs = cfg["optim"]["epochs"]
-    total = epochs * len(loader)
-    step = 0
+    ga = max(1, cfg["optim"].get("grad_accum", 1))            # match JEPA's effective batch
+    opt_steps_total = epochs * (len(loader) // ga)
+    opt.zero_grad(set_to_none=True)
+    micro = ostep = 0
     for ep in range(epochs):
         for batch in loader:
             batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
@@ -93,35 +95,50 @@ def train_byol(loader, cfg, device, logger=print):
                 t1 = proj_t(_pool_global(target, v1))
                 t2 = proj_t(_pool_global(target, v2))
             loss = byol_loss(p1, t2) + byol_loss(p2, t1)
-            opt.zero_grad(); loss.backward(); opt.step()
-            m = momentum_schedule(step, total, cfg["ema"]["base_momentum"], cfg["ema"]["final_momentum"])
-            ema_update(online, target, m)
-            ema_update(proj_o, proj_t, m)
-            if step % cfg["log"].get("diagnostics_every", 50) == 0:
-                logger(f"[byol] step {step} loss {loss.item():.4f}")
-            step += 1
+            (loss / ga).backward()
+            micro += 1
+            if micro % ga == 0:
+                opt.step(); opt.zero_grad(set_to_none=True)
+                # EMA after the optimizer step, momentum scheduled over optimizer steps
+                m = momentum_schedule(ostep, opt_steps_total,
+                                      cfg["ema"]["base_momentum"], cfg["ema"]["final_momentum"])
+                ema_update(online, target, m); ema_update(proj_o, proj_t, m)
+                if ostep % cfg["log"].get("diagnostics_every", 50) == 0:
+                    logger(f"[byol] opt-step {ostep} loss {loss.item():.4f}")
+                ostep += 1
     return online
 
 
 def train_simclr(loader, cfg, device, logger=print):
-    """SimCLR: backbone + projector, NT-Xent over two views."""
+    """SimCLR: backbone + projector, NT-Xent over two views.
+
+    NOTE: grad-accum below matches JEPA's *optimization* batch (192), but NT-Xent negatives are
+    still per-micro-batch (2*batch_size), since accumulation can't pool negatives across steps —
+    a true large-negative SimCLR needs a memory bank / all-gather (out of scope). So SimCLR's
+    contrastive batch stays at the loader batch size; we note this in the report.
+    """
     D = cfg["encoder"]["embed_dim"]
     backbone = _new_backbone(cfg, device)
     proj = projector(D, 4 * 256, 256).to(device)
     temp = cfg.get("simclr", {}).get("temperature", 0.5)
     opt = _opt(list(backbone.parameters()) + list(proj.parameters()), cfg)
     epochs = cfg["optim"]["epochs"]
-    step = 0
+    ga = max(1, cfg["optim"].get("grad_accum", 1))
+    opt.zero_grad(set_to_none=True)
+    micro = ostep = 0
     for ep in range(epochs):
         for batch in loader:
             batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
             v1, v2 = _two_views(batch)
             z = torch.cat([proj(_pool_global(backbone, v1)), proj(_pool_global(backbone, v2))], dim=0)
             loss = nt_xent_loss(z, temperature=temp)
-            opt.zero_grad(); loss.backward(); opt.step()
-            if step % cfg["log"].get("diagnostics_every", 50) == 0:
-                logger(f"[simclr] step {step} loss {loss.item():.4f}")
-            step += 1
+            (loss / ga).backward()
+            micro += 1
+            if micro % ga == 0:
+                opt.step(); opt.zero_grad(set_to_none=True)
+                if ostep % cfg["log"].get("diagnostics_every", 50) == 0:
+                    logger(f"[simclr] opt-step {ostep} loss {loss.item():.4f}")
+                ostep += 1
     return backbone
 
 
@@ -132,17 +149,22 @@ def train_mae(loader, cfg, device, logger=print):
                      mask_ratio=cfg.get("mae", {}).get("mask_ratio", 0.75)).to(device)
     opt = _opt(model.parameters(), cfg)
     epochs = cfg["optim"]["epochs"]
-    step = 0
+    ga = max(1, cfg["optim"].get("grad_accum", 1))            # match JEPA's effective batch
+    opt.zero_grad(set_to_none=True)
+    micro = ostep = 0
     for ep in range(epochs):
         for batch in loader:
             batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
             data, pad_mask = batch["data"], batch["pad_mask"]
             f = int(torch.randint(0, int(pad_mask.sum(1).min().item()), (1,)).item())
             loss = model(data[:, f])
-            opt.zero_grad(); loss.backward(); opt.step()
-            if step % cfg["log"].get("diagnostics_every", 50) == 0:
-                logger(f"[mae] step {step} loss {loss.item():.4f}")
-            step += 1
+            (loss / ga).backward()
+            micro += 1
+            if micro % ga == 0:
+                opt.step(); opt.zero_grad(set_to_none=True)
+                if ostep % cfg["log"].get("diagnostics_every", 50) == 0:
+                    logger(f"[mae] opt-step {ostep} loss {loss.item():.4f}")
+                ostep += 1
     return backbone
 
 
