@@ -16,14 +16,15 @@ caveats) see **[report.md](report.md)**. This README is the engineering referenc
 
 | Method | conv mIoU | k-NN | few-shot 1% / 5% / 10% |
 |---|---|---|---|
-| **Temporal JEPA (Δ=1)** | **22.3** | **65.5** | **9.5 / 12.6 / 15.4** |
-| Spatial JEPA | 16.6 | 58.7* | 5.5 / 6.6 / 9.5 |
-| SimCLR | 6.9 | 54.6* | 2.8 / 3.7 / 4.1 |
-| MAE | 5.2 | 54.4* | 2.9 / 3.3 / 3.3 |
-| BYOL | 4.6 | 62.7* | 4.0 / 5.4 / 4.3 |
+| **Temporal JEPA (Δ=1)** | **22.5** | **65.5** | **9.5 / 13.0 / 15.7** |
+| Spatial JEPA | 16.4 | 58.7* | 5.4 / 7.4 / 10.6 |
+| SimCLR | 8.1 | 54.6* | 2.6 / 3.6 / 4.0 |
+| BYOL | 6.1 | 62.7* | 4.0 / 5.3 / 4.3 |
+| MAE | 5.1 | 54.4* | 2.7 / 3.6 / 3.8 |
 
-Temporal JEPA wins at **every label fraction**; the gap over spatial JEPA *widens* from +34% (full
-labels) to **+71% at 1% labels** — the SSL data-efficiency story. Consistent across three
+Temporal JEPA wins at **every label fraction**; the gap over spatial JEPA *widens* from +37% (full
+labels) to **+76% at 1% labels** — the SSL data-efficiency story. Baselines shown at equalized
+effective batch 192. Consistent across three
 independent probes (dense mIoU, k-NN, few-shot), and it generalizes from val to test. (*k-NN shown
 from the val fold. Supervised U-TAE = 63.1 is the end-to-end ceiling, not a frozen-probe peer.
 MAE/BYOL/SimCLR train at effective batch 16 vs JEPA's 192 — see report.md §8.) Full analysis in

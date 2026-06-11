@@ -82,14 +82,17 @@ def _build_head(D, num_classes, head):
 
 def linear_probe_segmentation(encoder, train_loader, val_loader, num_classes=20,
                               ignore_index=19, epochs=20, lr=1e-3, device=None,
-                              use_temporal=True, head="linear"):
+                              use_temporal=True, head="linear", seed=0):
     """Freeze encoder; train a probe head -> per-pixel logits; report mIoU.
 
     use_temporal selects the feature pathway (see extract_dense_features): True for JEPA,
     False for spatial-only baselines. head: 'linear' (strict probe) or 'conv' (light decoder).
+    `seed` fixes the head init + data-order RNG so the reported mIoU is reproducible (otherwise it
+    varies ~±1 mIoU run-to-run — fine for the conclusion, bad for a results table).
 
     Returns: dict(miou=..., per_class_iou=tensor).
     """
+    torch.manual_seed(seed)
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
     encoder = encoder.to(device).eval()
     for p in encoder.parameters():

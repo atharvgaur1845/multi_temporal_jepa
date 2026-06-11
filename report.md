@@ -185,16 +185,19 @@ All four train the same `SITSEncoder` spatial backbone so the frozen-probe is un
 
 Frozen-encoder probes. Headline = **conv-head mIoU** (×100); `linear` = strict 1×1 probe.
 
-**Held-out TEST fold (folds 5):**
+**Held-out TEST fold (fold 5); baselines at equalized effective batch 192 (conv head):**
 
-| Method | conv mIoU | k-NN | few-shot 1% | 5% | 10% |
+| Method | conv mIoU | k-NN* | few-shot 1% | 5% | 10% |
 |---|---|---|---|---|---|
-| **Temporal JEPA (Δ=1)** | **22.3** | **65.5** | **9.5** | **12.6** | **15.4** |
-| Spatial JEPA | 16.6 | — | 5.5 | 6.6 | 9.5 |
-| SimCLR | 6.9 | — | 2.8 | 3.7 | 4.1 |
-| MAE | 5.2 | — | 2.9 | 3.3 | 3.3 |
-| BYOL | 4.6 | — | 4.0 | 5.4 | 4.3 |
+| **Temporal JEPA (Δ=1)** | **22.5** | **65.5** | **9.5** | **13.0** | **15.7** |
+| Spatial JEPA | 16.4 | 58.7 | 5.4 | 7.4 | 10.6 |
+| SimCLR | 8.1 | 54.6 | 2.6 | 3.6 | 4.0 |
+| BYOL | 6.1 | 62.7 | 4.0 | 5.3 | 4.3 |
+| MAE | 5.1 | 54.4 | 2.7 | 3.6 | 3.8 |
 | *Supervised U-TAE (ceiling, not a frozen-probe peer)* | *63.1* | — | — | — | — |
+
+*k-NN from the val fold. Compute-matched spatial JEPA (#6) and the horizon study (Δ=2,4,8) were
+training at the time of writing — rows to be added.*
 
 **Validation fold (folds 4), for model selection — confirms the test ranking:** temporal 22.1 /
 spatial 16.2 / simclr 8.3 / byol 5.0 / mae 3.8 conv mIoU; k-NN 66.8 / 58.7 / 54.6 / 62.7 / 54.4.
@@ -202,8 +205,8 @@ GPU-hours/cell: temporal 2.1, spatial 0.6, mae 0.5, byol 9.9, simclr 7.8.
 
 **Findings.**
 - **H1 supported (and it generalizes).** Temporal beats spatial JEPA on the *test* fold at every
-  label fraction: **+34%** conv mIoU at 100% labels (22.3 vs 16.6), widening to **+71%** at 1%
-  (9.5 vs 5.5). Val agrees (22.1 vs 16.2). The temporal-vs-spatial pair is the *cleanest*
+  label fraction: **+37%** conv mIoU at 100% labels (22.5 vs 16.4), widening to **+76%** at 1%
+  (9.5 vs 5.4). Val agrees (22.1 vs 16.2). The temporal-vs-spatial pair is the *cleanest*
   comparison — same trainer, same effective batch (192) — so this headline is airtight.
 - **H1 data-efficiency.** The temporal advantage *grows* as labels shrink — exactly the SSL story:
   good pretraining matters most in the low-label regime.
@@ -212,10 +215,10 @@ GPU-hours/cell: temporal 2.1, spatial 0.6, mae 0.5, byol 9.9, simclr 7.8.
   with compute.
 - **Consistent across three independent probes** (dense mIoU, k-NN, few-shot) → credible.
 
-*Note:* the non-JEPA baselines (MAE/BYOL/SimCLR) train at effective batch 16 vs JEPA's 192 (no
-grad-accum in their trainer **when these numbers were produced**) — see §8.2. Grad-accum has now
-been added to the baseline trainers (effective batch 192); **the baseline cells must be re-run** to
-refresh these numbers. The temporal>spatial result is unaffected (both already used batch 192).
+*Note:* these baseline numbers are the **equalized re-run** (effective batch 192, matching JEPA, via
+grad-accum). BYOL (4.6→6.1) and SimCLR (6.9→8.1) rose modestly with the larger batch; MAE was flat.
+They remain far below temporal/spatial — the gap is the objective, not the batch size. (SimCLR's
+NT-Xent *negatives* are still per-micro-batch; a memory bank is out of scope — see §8.2.)
 
 ---
 
@@ -225,12 +228,11 @@ refresh these numbers. The temporal>spatial result is unaffected (both already u
    claim as "equal epochs," and add a **compute-matched spatial-JEPA run** (train it to ≈2.1 GPU-h)
    as a robustness check, since spatial used *less* compute than temporal. (BYOL/SimCLR used more
    and still lost, so they are not a concern.)
-2. **Baseline batch confound — FIXED (re-run pending).** The baseline numbers above were produced
-   at **effective batch 16** vs JEPA's **192**. Grad-accumulation has now been added to all three
-   baseline trainers (effective batch 192). **Action:** delete `runs/matrix/{mae,byol,simclr}.pt`
-   and re-run those cells to refresh the table. *Caveat:* for SimCLR, grad-accum equalizes the
-   *optimization* batch but not the NT-Xent *negative* count (still per-micro-batch); a true
-   large-negative SimCLR needs a memory bank — note this rather than over-claim.
+2. **Baseline batch confound — FIXED & re-run.** Grad-accumulation was added to all three baseline
+   trainers and they were re-run at **effective batch 192** (matching JEPA); the §7 table reflects
+   this. BYOL/SimCLR rose modestly, MAE flat — all still far below temporal/spatial. *Remaining
+   caveat:* for SimCLR, grad-accum equalizes the *optimization* batch but not the NT-Xent *negative*
+   count (still per-micro-batch); a true large-negative SimCLR needs a memory bank (out of scope).
 3. **Val, not test.** These are val-fold numbers for model selection. Final numbers must come from
    the **test fold** for the chosen settings only (avoid test-set leakage), with **few-shot** for
    the low-label story.
