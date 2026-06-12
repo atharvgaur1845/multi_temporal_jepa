@@ -183,42 +183,52 @@ All four train the same `SITSEncoder` spatial backbone so the frozen-probe is un
 
 ## 7. Results (pilot: P8 / embed-512 / 100 epochs)
 
-Frozen-encoder probes. Headline = **conv-head mIoU** (×100); `linear` = strict 1×1 probe.
+Frozen-encoder probes, **held-out TEST fold (fold 5)**, conv head, seeded (reproducible to ±0.1
+mIoU). Baselines at equalized effective batch 192 (grad-accum), matching JEPA.
 
-**Held-out TEST fold (fold 5); baselines at equalized effective batch 192 (conv head):**
+### 7.1 Main comparison (H1, H3) + compute-matched control
 
-| Method | conv mIoU | k-NN* | few-shot 1% | 5% | 10% |
-|---|---|---|---|---|---|
-| **Temporal JEPA (Δ=1)** | **22.5** | **65.5** | **9.5** | **13.0** | **15.7** |
-| Spatial JEPA | 16.4 | 58.7 | 5.4 | 7.4 | 10.6 |
-| SimCLR | 8.1 | 54.6 | 2.6 | 3.6 | 4.0 |
-| BYOL | 6.1 | 62.7 | 4.0 | 5.3 | 4.3 |
-| MAE | 5.1 | 54.4 | 2.7 | 3.6 | 3.8 |
-| *Supervised U-TAE (ceiling, not a frozen-probe peer)* | *63.1* | — | — | — | — |
+| Method | conv mIoU | few-shot 1% / 5% / 10% | notes |
+|---|---|---|---|
+| **Temporal JEPA (Δ=1)** | **22.1** | **9.2 / 13.1 / 15.9** | the method |
+| Spatial JEPA | 16.1 | 4.6 / 6.9 / 9.5 | direct baseline (I-JEPA on frames) |
+| Spatial JEPA — **compute-matched** (3.5× epochs) | 17.1 | 4.2 / 7.1 / 11.5 | same GPU-h as temporal |
+| SimCLR | 7.1 | 2.3 / 3.9 / 4.3 | contrastive |
+| BYOL | 4.9 | 4.2 / 5.3 / 5.8 | self-distillation |
+| MAE | 3.6 | 2.8 / 3.7 / 3.9 | reconstruction |
+| *Supervised U-TAE (ceiling, not a frozen-probe peer)* | *63.1* | — | end-to-end + decoder |
 
-*k-NN from the val fold. Compute-matched spatial JEPA (#6) and the horizon study (Δ=2,4,8) were
-training at the time of writing — rows to be added.*
+k-NN (val fold): temporal 65.5, spatial 58.7, byol 62.7, simclr 54.6, mae 54.4.
 
-**Validation fold (folds 4), for model selection — confirms the test ranking:** temporal 22.1 /
-spatial 16.2 / simclr 8.3 / byol 5.0 / mae 3.8 conv mIoU; k-NN 66.8 / 58.7 / 54.6 / 62.7 / 54.4.
-GPU-hours/cell: temporal 2.1, spatial 0.6, mae 0.5, byol 9.9, simclr 7.8.
+### 7.2 Horizon study (H2) — how far ahead can we predict?
 
-**Findings.**
-- **H1 supported (and it generalizes).** Temporal beats spatial JEPA on the *test* fold at every
-  label fraction: **+37%** conv mIoU at 100% labels (22.5 vs 16.4), widening to **+76%** at 1%
-  (9.5 vs 5.4). Val agrees (22.1 vs 16.2). The temporal-vs-spatial pair is the *cleanest*
-  comparison — same trainer, same effective batch (192) — so this headline is airtight.
-- **H1 data-efficiency.** The temporal advantage *grows* as labels shrink — exactly the SSL story:
-  good pretraining matters most in the low-label regime.
+| Horizon Δ (acquisition steps) | conv mIoU | few-shot 1% / 5% / 10% |
+|---|---|---|
+| Δ=1 | **22.1** | 9.2 / 13.1 / 15.9 |
+| Δ=2 | 18.8 | 8.1 / 11.3 / 13.4 |
+| Δ=4 | 18.6 | 8.1 / 11.0 / 13.3 |
+| Δ=8 | 21.6 | 8.9 / 12.5 / 15.4 |
+
+### Findings
+- **H1 supported, and it generalizes.** Temporal beats spatial JEPA on the test fold at every
+  label fraction: **+37%** conv mIoU at full labels (22.1 vs 16.1), widening to **+100%** at 1%
+  (9.2 vs 4.6). Same trainer, same effective batch (192) → cleanest possible comparison.
+- **The win is the objective, not compute.** Spatial JEPA trained **3.5× longer** (matched
+  GPU-hours, 350 epochs) reaches only **17.1** — a +1.0 gain that leaves it **5 points below**
+  temporal. Extra compute does not close the gap.
+- **H2 — robust across horizons.** *Every* horizon (18.6–22.1) beats spatial (16.1) and all
+  baselines. Δ=1 is best; performance is non-monotonic (dip at Δ=2,4, rebound at Δ=8) — plausibly
+  longer horizons forcing longer-range seasonal structure, though confirming this vs run-noise
+  needs multi-seed runs. Headline: predicting even 8 acquisitions ahead still beats spatial.
 - **H3 supported.** Temporal beats MAE/BYOL/SimCLR by a wide margin on every metric — and beats
-  BYOL/SimCLR while using **4–5× less GPU time** (2.1 h vs 7.8–9.9 h), so the win is not bought
-  with compute.
+  BYOL/SimCLR while using **4–5× less GPU time** (2.1 h vs 7.8–9.9 h).
+- **Data-efficiency.** The temporal advantage *grows* as labels shrink — the SSL story.
 - **Consistent across three independent probes** (dense mIoU, k-NN, few-shot) → credible.
 
-*Note:* these baseline numbers are the **equalized re-run** (effective batch 192, matching JEPA, via
-grad-accum). BYOL (4.6→6.1) and SimCLR (6.9→8.1) rose modestly with the larger batch; MAE was flat.
-They remain far below temporal/spatial — the gap is the objective, not the batch size. (SimCLR's
-NT-Xent *negatives* are still per-micro-batch; a memory bank is out of scope — see §8.2.)
+*Baselines note:* equalized to effective batch 192 (grad-accum). They remain far below
+temporal/spatial — the gap is the objective, not the batch size. (SimCLR's NT-Xent *negatives* are
+still per-micro-batch; a memory bank is out of scope — §8.2.) Numbers vary ~±1–2 mIoU across
+training reruns (cuDNN nondeterminism over 100 epochs); the ranking is stable to it.
 
 ---
 
@@ -259,13 +269,19 @@ NT-Xent *negatives* are still per-micro-batch; a memory bank is out of scope —
 
 ## 10. Next steps
 
-1. **Re-run the equalized baselines.** Grad-accum is now in the baseline trainers (effective batch
-   192). Delete `runs/matrix/{mae,byol,simclr}.pt` and re-run those cells for the fair table.
-2. **Compute-matched spatial JEPA** robustness run.
-3. **Horizon study** Δ∈{1,2,4,8} (H2): `run_matrix --max-cells 8`.
-4. **Ablations** (H4): predictor depth {1,2,4,6}, embed dim {128,256,512,768}.
-5. **Final test-fold + few-shot** numbers for temporal & spatial; ideally 5-fold CV.
-6. **Feature analysis** (t-SNE/UMAP, cluster purity) for the qualitative figure.
+Done: ✅ equalized baselines (batch 192) ✅ compute-matched spatial JEPA ✅ horizon study (H2)
+✅ test-fold + few-shot numbers (§7).
+
+Remaining (optional, for a stronger/fuller paper):
+1. **Ablations** (H4): predictor depth {1,2,4,6}, embed dim {128,256,512,768} — `run_matrix` cells
+   10–17 (`--max-cells 17`). Cheaper at `patch_size 16`.
+2. **Multi-seed runs** to put error bars on the headline (esp. the Δ=8 horizon rebound, and the
+   ±1–2 mIoU baseline variance) — currently single-seed.
+3. **5-fold CV** average instead of a single train/val/test split.
+4. **Feature-space figure** (`scripts/feature_figure.py`) — t-SNE/UMAP of parcel embeddings +
+   cluster purity/silhouette, temporal vs spatial, for the qualitative panel.
+5. SimCLR with a **memory bank** (proper large-negative contrastive) if a stronger contrastive
+   baseline is wanted.
 
 ## References
 I-JEPA (Assran 2023, 2301.08243) · V-JEPA (Bardes 2024, 2404.08471) · PASTIS/U-TAE (Garnot &

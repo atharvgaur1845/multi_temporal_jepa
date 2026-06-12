@@ -16,15 +16,17 @@ caveats) see **[report.md](report.md)**. This README is the engineering referenc
 
 | Method | conv mIoU | k-NN | few-shot 1% / 5% / 10% |
 |---|---|---|---|
-| **Temporal JEPA (Δ=1)** | **22.5** | **65.5** | **9.5 / 13.0 / 15.7** |
-| Spatial JEPA | 16.4 | 58.7* | 5.4 / 7.4 / 10.6 |
-| SimCLR | 8.1 | 54.6* | 2.6 / 3.6 / 4.0 |
-| BYOL | 6.1 | 62.7* | 4.0 / 5.3 / 4.3 |
-| MAE | 5.1 | 54.4* | 2.7 / 3.6 / 3.8 |
+| **Temporal JEPA (Δ=1)** | **22.1** | **65.5** | **9.2 / 13.1 / 15.9** |
+| Spatial JEPA | 16.1 | 58.7* | 4.6 / 6.9 / 9.5 |
+| Spatial JEPA — compute-matched (3.5× epochs) | 17.1 | — | 4.2 / 7.1 / 11.5 |
+| SimCLR | 7.1 | 54.6* | 2.3 / 3.9 / 4.3 |
+| BYOL | 4.9 | 62.7* | 4.2 / 5.3 / 5.8 |
+| MAE | 3.6 | 54.4* | 2.8 / 3.7 / 3.9 |
 
 Temporal JEPA wins at **every label fraction**; the gap over spatial JEPA *widens* from +37% (full
-labels) to **+76% at 1% labels** — the SSL data-efficiency story. Baselines shown at equalized
-effective batch 192. Consistent across three
+labels) to **+100% at 1% labels**. Spatial JEPA trained **3.5× longer** (compute-matched) reaches
+only 17.1 — the win is the *objective*, not compute. **Horizon study:** Δ=1/2/4/8 → 22.1/18.8/18.6/21.6,
+all beating spatial. Baselines at equalized effective batch 192. Full analysis: **[report.md](report.md)**. Consistent across three
 independent probes (dense mIoU, k-NN, few-shot), and it generalizes from val to test. (*k-NN shown
 from the val fold. Supervised U-TAE = 63.1 is the end-to-end ceiling, not a frozen-probe peer.
 MAE/BYOL/SimCLR train at effective batch 16 vs JEPA's 192 — see report.md §8.) Full analysis in
