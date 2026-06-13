@@ -1,0 +1,241 @@
+nohup: ignoring input
+[run_matrix] 22 cells total; running 9; skipping 13
+[run_matrix] SKIPPED (budget): tjepa_noreg
+[run_matrix] SKIPPED (budget): tjepa_var0.5
+[run_matrix] SKIPPED (budget): tjepa_var2.0
+[run_matrix] SKIPPED (budget): tjepa_pred128
+[run_matrix] SKIPPED (budget): tjepa_pred256
+[run_matrix] SKIPPED (budget): tjepa_preddepth1
+[run_matrix] SKIPPED (budget): tjepa_preddepth2
+[run_matrix] SKIPPED (budget): tjepa_preddepth4
+[run_matrix] SKIPPED (budget): tjepa_preddepth6
+[run_matrix] SKIPPED (budget): tjepa_dim128
+[run_matrix] SKIPPED (budget): tjepa_dim256
+[run_matrix] SKIPPED (budget): tjepa_dim512
+[run_matrix] SKIPPED (budget): tjepa_dim768
+[run_matrix] device = cuda:1  seed = 0
+[run_matrix] probing on val folds [4]
+step 0 loss 1.9986 lr 0.00e+00 wd 0.040 std 0.343 effrank 15.2 varratio 0.055
+step 50 loss 1.1824 lr 1.11e-04 wd 0.040 std 0.575 effrank 18.3 varratio 0.018
+step 100 loss 1.0253 lr 2.22e-04 wd 0.041 std 0.598 effrank 21.5 varratio 0.006
+step 150 loss 0.9013 lr 3.33e-04 wd 0.042 std 0.645 effrank 32.6 varratio 0.044
+step 200 loss 0.8720 lr 4.44e-04 wd 0.044 std 0.722 effrank 52.2 varratio 0.112
+step 250 loss 0.7319 lr 5.56e-04 wd 0.046 std 0.842 effrank 78.1 varratio 0.209
+step 300 loss 0.7448 lr 6.67e-04 wd 0.049 std 0.888 effrank 115.8 varratio 0.229
+step 350 loss 0.5203 lr 7.78e-04 wd 0.052 std 0.937 effrank 149.4 varratio 0.311
+step 400 loss 0.5429 lr 8.89e-04 wd 0.056 std 0.965 effrank 174.3 varratio 0.287
+step 450 loss 0.5066 lr 1.00e-03 wd 0.060 std 0.992 effrank 198.7 varratio 0.269
+step 500 loss 0.3613 lr 9.99e-04 wd 0.064 std 0.998 effrank 232.8 varratio 0.327
+step 550 loss 0.3535 lr 9.96e-04 wd 0.069 std 1.010 effrank 249.6 varratio 0.316
+step 600 loss 0.4585 lr 9.91e-04 wd 0.074 std 1.014 effrank 276.7 varratio 0.235
+Traceback (most recent call last):
+  File "/home/jagat/Atharv/multi_temporal_jepa/scripts/run_matrix.py", line 249, in <module>
+    main()
+  File "/home/jagat/Atharv/multi_temporal_jepa/scripts/run_matrix.py", line 195, in main
+    step = train_one_epoch(model, loader, opt, scaler, cfg, step, total, device)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jagat/Atharv/multi_temporal_jepa/engine/train_jepa.py", line 84, in train_one_epoch
+    batch = _to_device(batch, device)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jagat/Atharv/multi_temporal_jepa/engine/train_jepa.py", line 35, in _to_device
+    out[k] = v.to(device) if torch.is_tensor(v) else v
+             ^^^^^^^^^^^^
+KeyboardInterrupt
+nohup: ignoring input
+[run_matrix] 22 cells total; running 9; skipping 13
+[run_matrix] SKIPPED (budget): tjepa_noreg
+[run_matrix] SKIPPED (budget): tjepa_var0.5
+[run_matrix] SKIPPED (budget): tjepa_var2.0
+[run_matrix] SKIPPED (budget): tjepa_pred128
+[run_matrix] SKIPPED (budget): tjepa_pred256
+[run_matrix] SKIPPED (budget): tjepa_preddepth1
+[run_matrix] SKIPPED (budget): tjepa_preddepth2
+[run_matrix] SKIPPED (budget): tjepa_preddepth4
+[run_matrix] SKIPPED (budget): tjepa_preddepth6
+[run_matrix] SKIPPED (budget): tjepa_dim128
+[run_matrix] SKIPPED (budget): tjepa_dim256
+[run_matrix] SKIPPED (budget): tjepa_dim512
+[run_matrix] SKIPPED (budget): tjepa_dim768
+[run_matrix] device = cuda:1  seed = 0
+[run_matrix] probing on val folds [4]
+step 0 loss 2.0005 lr 0.00e+00 wd 0.040 std 0.340 effrank 15.3 varratio 0.050
+Traceback (most recent call last):
+  File "/home/jagat/Atharv/multi_temporal_jepa/scripts/run_matrix.py", line 249, in <module>
+    main()
+  File "/home/jagat/Atharv/multi_temporal_jepa/scripts/run_matrix.py", line 195, in main
+    step = train_one_epoch(model, loader, opt, scaler, cfg, step, total, device)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jagat/Atharv/multi_temporal_jepa/engine/train_jepa.py", line 106, in train_one_epoch
+    scaler.scale(loss / grad_accum).backward()
+  File "/home/jagat/miniforge3/lib/python3.12/site-packages/torch/_tensor.py", line 630, in backward
+    torch.autograd.backward(
+  File "/home/jagat/miniforge3/lib/python3.12/site-packages/torch/autograd/__init__.py", line 364, in backward
+    _engine_run_backward(
+  File "/home/jagat/miniforge3/lib/python3.12/site-packages/torch/autograd/graph.py", line 865, in _engine_run_backward
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 3.00 GiB. GPU 1 has a total capacity of 47.40 GiB of which 2.92 GiB is free. Process 660151 has 1.06 GiB memory in use. Process 668594 has 1.08 GiB memory in use. Process 701673 has 1.08 GiB memory in use. Process 767897 has 5.23 GiB memory in use. Including non-PyTorch memory, this process has 35.98 GiB memory in use. Of the allocated memory 30.03 GiB is allocated by PyTorch, and 5.58 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+nohup: ignoring input
+[run_matrix] 22 cells total; running 9; skipping 13
+[run_matrix] SKIPPED (budget): tjepa_noreg
+[run_matrix] SKIPPED (budget): tjepa_var0.5
+[run_matrix] SKIPPED (budget): tjepa_var2.0
+[run_matrix] SKIPPED (budget): tjepa_pred128
+[run_matrix] SKIPPED (budget): tjepa_pred256
+[run_matrix] SKIPPED (budget): tjepa_preddepth1
+[run_matrix] SKIPPED (budget): tjepa_preddepth2
+[run_matrix] SKIPPED (budget): tjepa_preddepth4
+[run_matrix] SKIPPED (budget): tjepa_preddepth6
+[run_matrix] SKIPPED (budget): tjepa_dim128
+[run_matrix] SKIPPED (budget): tjepa_dim256
+[run_matrix] SKIPPED (budget): tjepa_dim512
+[run_matrix] SKIPPED (budget): tjepa_dim768
+[run_matrix] device = cuda:1  seed = 0
+[run_matrix] probing on val folds [4]
+step 0 loss 1.9982 lr 0.00e+00 wd 0.040 std 0.344 effrank 15.2 varratio 0.055
+step 50 loss 1.1828 lr 1.11e-04 wd 0.040 std 0.575 effrank 18.4 varratio 0.018
+step 100 loss 1.0257 lr 2.22e-04 wd 0.041 std 0.599 effrank 21.5 varratio 0.006
+step 150 loss 0.8940 lr 3.33e-04 wd 0.042 std 0.681 effrank 32.9 varratio 0.047
+step 200 loss 0.8820 lr 4.44e-04 wd 0.044 std 0.736 effrank 50.0 varratio 0.081
+step 250 loss 0.7623 lr 5.56e-04 wd 0.046 std 0.819 effrank 72.2 varratio 0.181
+step 300 loss 0.8015 lr 6.67e-04 wd 0.049 std 0.869 effrank 106.6 varratio 0.221
+step 350 loss 0.5296 lr 7.78e-04 wd 0.052 std 0.941 effrank 142.6 varratio 0.291
+step 400 loss 0.6021 lr 8.89e-04 wd 0.056 std 0.952 effrank 163.3 varratio 0.285
+step 450 loss 0.5202 lr 1.00e-03 wd 0.060 std 0.996 effrank 186.9 varratio 0.267
+step 500 loss 0.3778 lr 9.99e-04 wd 0.064 std 0.996 effrank 219.7 varratio 0.325
+step 550 loss 0.3814 lr 9.96e-04 wd 0.069 std 1.010 effrank 226.6 varratio 0.290
+step 600 loss 0.4743 lr 9.91e-04 wd 0.074 std 1.006 effrank 255.0 varratio 0.220
+step 650 loss 0.3968 lr 9.85e-04 wd 0.080 std 1.012 effrank 271.8 varratio 0.268
+step 700 loss 0.3917 lr 9.76e-04 wd 0.086 std 1.013 effrank 286.7 varratio 0.282
+step 750 loss 0.4099 lr 9.66e-04 wd 0.093 std 1.013 effrank 305.1 varratio 0.241
+step 800 loss 0.4029 lr 9.54e-04 wd 0.100 std 1.017 effrank 316.1 varratio 0.279
+step 850 loss 0.4102 lr 9.41e-04 wd 0.107 std 1.014 effrank 328.3 varratio 0.222
+step 900 loss 0.3403 lr 9.25e-04 wd 0.114 std 1.013 effrank 338.0 varratio 0.297
+step 950 loss 0.3992 lr 9.08e-04 wd 0.122 std 1.022 effrank 348.2 varratio 0.265
+step 1000 loss 0.3256 lr 8.90e-04 wd 0.130 std 1.013 effrank 343.9 varratio 0.248
+step 1050 loss 0.4283 lr 8.70e-04 wd 0.138 std 1.018 effrank 355.8 varratio 0.241
+step 1100 loss 0.3833 lr 8.48e-04 wd 0.147 std 1.018 effrank 365.9 varratio 0.240
+step 1150 loss 0.3630 lr 8.25e-04 wd 0.155 std 1.018 effrank 373.2 varratio 0.280
+step 1200 loss 0.3690 lr 8.02e-04 wd 0.164 std 1.023 effrank 372.1 varratio 0.250
+step 1250 loss 0.3216 lr 7.76e-04 wd 0.173 std 1.020 effrank 384.4 varratio 0.291
+step 1300 loss 0.4312 lr 7.50e-04 wd 0.183 std 1.015 effrank 383.7 varratio 0.251
+step 1350 loss 0.4127 lr 7.23e-04 wd 0.192 std 1.021 effrank 392.5 varratio 0.221
+step 1400 loss 0.4806 lr 6.95e-04 wd 0.201 std 1.017 effrank 397.4 varratio 0.211
+step 1450 loss 0.4105 lr 6.67e-04 wd 0.211 std 1.014 effrank 398.4 varratio 0.247
+step 1500 loss 0.3581 lr 6.37e-04 wd 0.220 std 1.014 effrank 405.3 varratio 0.265
+step 1550 loss 0.3706 lr 6.07e-04 wd 0.229 std 1.022 effrank 408.0 varratio 0.269
+step 1600 loss 0.4023 lr 5.77e-04 wd 0.239 std 1.023 effrank 407.5 varratio 0.269
+step 1650 loss 0.4084 lr 5.47e-04 wd 0.248 std 1.018 effrank 415.2 varratio 0.262
+step 1700 loss 0.3990 lr 5.16e-04 wd 0.257 std 1.021 effrank 413.2 varratio 0.249
+step 1750 loss 0.4178 lr 4.85e-04 wd 0.267 std 1.014 effrank 417.2 varratio 0.237
+step 1800 loss 0.3998 lr 4.54e-04 wd 0.276 std 1.020 effrank 416.0 varratio 0.237
+step 1850 loss 0.4227 lr 4.24e-04 wd 0.285 std 1.016 effrank 422.2 varratio 0.266
+step 1900 loss 0.3322 lr 3.94e-04 wd 0.293 std 1.018 effrank 427.9 varratio 0.271
+step 1950 loss 0.4337 lr 3.64e-04 wd 0.302 std 1.015 effrank 427.5 varratio 0.255
+step 2000 loss 0.4197 lr 3.34e-04 wd 0.310 std 1.013 effrank 430.5 varratio 0.255
+step 2050 loss 0.3826 lr 3.06e-04 wd 0.318 std 1.016 effrank 434.1 varratio 0.273
+step 2100 loss 0.3656 lr 2.78e-04 wd 0.326 std 1.020 effrank 437.3 varratio 0.290
+step 2150 loss 0.4347 lr 2.51e-04 wd 0.333 std 1.019 effrank 437.3 varratio 0.252
+step 2200 loss 0.4428 lr 2.25e-04 wd 0.340 std 1.018 effrank 438.0 varratio 0.252
+step 2250 loss 0.3735 lr 1.99e-04 wd 0.347 std 1.016 effrank 441.1 varratio 0.240
+step 2300 loss 0.3990 lr 1.76e-04 wd 0.354 std 1.018 effrank 445.1 varratio 0.262
+step 2350 loss 0.4301 lr 1.53e-04 wd 0.360 std 1.019 effrank 445.1 varratio 0.255
+step 2400 loss 0.4295 lr 1.31e-04 wd 0.366 std 1.017 effrank 447.3 varratio 0.258
+step 2450 loss 0.3399 lr 1.11e-04 wd 0.371 std 1.017 effrank 446.5 varratio 0.290
+step 2500 loss 0.3852 lr 9.28e-05 wd 0.376 std 1.012 effrank 450.5 varratio 0.267
+step 2550 loss 0.4169 lr 7.58e-05 wd 0.380 std 1.017 effrank 449.4 varratio 0.287
+step 2600 loss 0.3629 lr 6.04e-05 wd 0.384 std 1.015 effrank 449.4 varratio 0.296
+step 2650 loss 0.3945 lr 4.67e-05 wd 0.388 std 1.014 effrank 452.8 varratio 0.270
+step 2700 loss 0.4095 lr 3.47e-05 wd 0.391 std 1.009 effrank 451.7 varratio 0.245
+step 2750 loss 0.4224 lr 2.45e-05 wd 0.394 std 1.016 effrank 453.1 varratio 0.275
+step 2800 loss 0.3654 lr 1.61e-05 wd 0.396 std 1.012 effrank 453.1 varratio 0.279
+step 2850 loss 0.3967 lr 9.50e-06 wd 0.398 std 1.015 effrank 453.0 varratio 0.305
+step 2900 loss 0.3924 lr 4.79e-06 wd 0.399 std 1.014 effrank 453.3 varratio 0.264
+step 2950 loss 0.4362 lr 1.95e-06 wd 0.400 std 1.014 effrank 454.0 varratio 0.277
+[run_matrix] tjepa_h1: linear=19.26 conv=22.84 knn=0.6846 gpu_h=2.66
+step 0 loss 2.2998 lr 0.00e+00 wd 0.040 std 0.521 effrank 9.1 varratio 0.080
+step 50 loss 1.2889 lr 1.11e-04 wd 0.040 std 0.288 effrank 12.1 varratio 0.017
+step 100 loss 1.0182 lr 2.22e-04 wd 0.041 std 0.483 effrank 13.7 varratio 0.008
+step 150 loss 0.8597 lr 3.33e-04 wd 0.042 std 0.497 effrank 17.4 varratio 0.138
+step 200 loss 0.7185 lr 4.44e-04 wd 0.044 std 0.561 effrank 22.9 varratio 0.117
+step 250 loss 0.6799 lr 5.56e-04 wd 0.046 std 0.662 effrank 30.3 varratio 0.275
+step 300 loss 0.5894 lr 6.67e-04 wd 0.049 std 0.687 effrank 39.2 varratio 0.423
+step 350 loss 0.5620 lr 7.78e-04 wd 0.052 std 0.730 effrank 47.2 varratio 0.544
+step 400 loss 0.5831 lr 8.89e-04 wd 0.056 std 0.796 effrank 52.9 varratio 0.425
+step 450 loss 0.4583 lr 1.00e-03 wd 0.060 std 0.830 effrank 72.3 varratio 0.579
+step 500 loss 0.4179 lr 9.99e-04 wd 0.064 std 0.885 effrank 87.6 varratio 0.500
+step 550 loss 0.3279 lr 9.96e-04 wd 0.069 std 0.938 effrank 121.0 varratio 0.549
+step 600 loss 0.3111 lr 9.91e-04 wd 0.074 std 0.961 effrank 145.6 varratio 0.541
+step 650 loss 0.2718 lr 9.85e-04 wd 0.080 std 0.977 effrank 170.2 varratio 0.590
+step 700 loss 0.2784 lr 9.76e-04 wd 0.086 std 0.986 effrank 197.8 varratio 0.493
+step 750 loss 0.3129 lr 9.66e-04 wd 0.093 std 0.992 effrank 220.4 varratio 0.455
+step 800 loss 0.2820 lr 9.54e-04 wd 0.100 std 1.001 effrank 244.3 varratio 0.480
+step 850 loss 0.2819 lr 9.41e-04 wd 0.107 std 1.003 effrank 255.9 varratio 0.497
+step 900 loss 0.2731 lr 9.25e-04 wd 0.114 std 1.008 effrank 283.0 varratio 0.503
+step 950 loss 0.3495 lr 9.08e-04 wd 0.122 std 1.010 effrank 290.7 varratio 0.421
+step 1000 loss 0.3685 lr 8.90e-04 wd 0.130 std 1.010 effrank 285.2 varratio 0.469
+step 1050 loss 0.3800 lr 8.70e-04 wd 0.138 std 1.016 effrank 310.6 varratio 0.439
+step 1100 loss 0.3975 lr 8.48e-04 wd 0.147 std 1.015 effrank 300.6 varratio 0.448
+step 1150 loss 0.4039 lr 8.25e-04 wd 0.155 std 1.018 effrank 339.1 varratio 0.378
+step 1200 loss 0.4432 lr 8.02e-04 wd 0.164 std 1.018 effrank 347.9 varratio 0.376
+step 1250 loss 0.4586 lr 7.76e-04 wd 0.173 std 1.017 effrank 344.5 varratio 0.390
+step 1300 loss 0.3811 lr 7.50e-04 wd 0.183 std 1.016 effrank 353.4 varratio 0.410
+step 1350 loss 0.4908 lr 7.23e-04 wd 0.192 std 1.018 effrank 354.4 varratio 0.366
+step 1400 loss 0.5352 lr 6.95e-04 wd 0.201 std 1.017 effrank 359.9 varratio 0.338
+step 1450 loss 0.5343 lr 6.67e-04 wd 0.211 std 1.019 effrank 372.0 varratio 0.332
+step 1500 loss 0.4851 lr 6.37e-04 wd 0.220 std 1.019 effrank 373.2 varratio 0.374
+step 1550 loss 0.5409 lr 6.07e-04 wd 0.229 std 1.019 effrank 381.6 varratio 0.331
+step 1600 loss 0.5911 lr 5.77e-04 wd 0.239 std 1.018 effrank 379.2 varratio 0.304
+step 1650 loss 0.5408 lr 5.47e-04 wd 0.248 std 1.021 effrank 385.7 varratio 0.345
+step 1700 loss 0.5635 lr 5.16e-04 wd 0.257 std 1.017 effrank 378.7 varratio 0.343
+step 1750 loss 0.6033 lr 4.85e-04 wd 0.267 std 1.019 effrank 391.8 varratio 0.307
+step 1800 loss 0.5619 lr 4.54e-04 wd 0.276 std 1.020 effrank 399.7 varratio 0.321
+step 1850 loss 0.6203 lr 4.24e-04 wd 0.285 std 1.019 effrank 403.9 varratio 0.277
+step 1900 loss 0.6055 lr 3.94e-04 wd 0.293 std 1.020 effrank 404.1 varratio 0.309
+step 1950 loss 0.6721 lr 3.64e-04 wd 0.302 std 1.018 effrank 390.8 varratio 0.277
+step 2000 loss 0.5657 lr 3.34e-04 wd 0.310 std 1.019 effrank 389.1 varratio 0.340
+step 2050 loss 0.6190 lr 3.06e-04 wd 0.318 std 1.018 effrank 387.7 varratio 0.311
+step 2100 loss 0.6310 lr 2.78e-04 wd 0.326 std 1.017 effrank 392.0 varratio 0.301
+step 2150 loss 0.6514 lr 2.51e-04 wd 0.333 std 1.019 effrank 412.6 varratio 0.274
+step 2200 loss 0.6746 lr 2.25e-04 wd 0.340 std 1.016 effrank 394.5 varratio 0.281
+step 2250 loss 0.6577 lr 1.99e-04 wd 0.347 std 1.018 effrank 410.6 varratio 0.285
+step 2300 loss 0.6571 lr 1.76e-04 wd 0.354 std 1.019 effrank 419.5 varratio 0.266
+step 2350 loss 0.5816 lr 1.53e-04 wd 0.360 std 1.019 effrank 416.9 varratio 0.321
+step 2400 loss 0.6519 lr 1.31e-04 wd 0.366 std 1.019 effrank 423.0 varratio 0.281
+step 2450 loss 0.6699 lr 1.11e-04 wd 0.371 std 1.018 effrank 418.6 varratio 0.270
+step 2500 loss 0.6395 lr 9.28e-05 wd 0.376 std 1.018 effrank 420.4 varratio 0.290
+step 2550 loss 0.6545 lr 7.58e-05 wd 0.380 std 1.018 effrank 406.6 varratio 0.289
+step 2600 loss 0.6592 lr 6.04e-05 wd 0.384 std 1.018 effrank 419.4 varratio 0.284
+step 2650 loss 0.6446 lr 4.67e-05 wd 0.388 std 1.018 effrank 421.3 varratio 0.288
+step 2700 loss 0.7227 lr 3.47e-05 wd 0.391 std 1.015 effrank 402.5 varratio 0.246
+step 2750 loss 0.6681 lr 2.45e-05 wd 0.394 std 1.018 effrank 422.3 varratio 0.273
+step 2800 loss 0.6822 lr 1.61e-05 wd 0.396 std 1.017 effrank 400.1 varratio 0.274
+step 2850 loss 0.6828 lr 9.50e-06 wd 0.398 std 1.018 effrank 409.9 varratio 0.264
+step 2900 loss 0.6836 lr 4.79e-06 wd 0.399 std 1.017 effrank 409.9 varratio 0.271
+step 2950 loss 0.6620 lr 1.95e-06 wd 0.400 std 1.018 effrank 426.2 varratio 0.273
+[run_matrix] spatial_jepa: linear=12.47 conv=16.16 knn=0.5685 gpu_h=0.52
+[mae] opt-step 0 loss 1.3359
+[mae] opt-step 50 loss 0.2042
+[mae] opt-step 100 loss 0.4283
+[mae] opt-step 150 loss 0.3938
+[mae] opt-step 200 loss 0.7407
+[mae] opt-step 250 loss 0.4093
+[mae] opt-step 300 loss 1.5004
+[mae] opt-step 350 loss 0.3534
+[mae] opt-step 400 loss 0.4096
+[mae] opt-step 450 loss 0.2256
+[mae] opt-step 500 loss 0.4207
+[mae] opt-step 550 loss 0.2146
+[mae] opt-step 600 loss 0.2976
+[mae] opt-step 650 loss 0.4106
+[mae] opt-step 700 loss 0.4006
+Traceback (most recent call last):
+  File "/home/jagat/Atharv/multi_temporal_jepa/scripts/run_matrix.py", line 249, in <module>
+    main()
+  File "/home/jagat/Atharv/multi_temporal_jepa/scripts/run_matrix.py", line 215, in main
+    res = linear_probe_segmentation(encoder, tl, el, num_classes=data_cfg["num_classes"],
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jagat/Atharv/multi_temporal_jepa/eval/linear_probe.py", line 111, in linear_probe_segmentation
+    batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
+                 ^^^^^^^^^^^^
+KeyboardInterrupt

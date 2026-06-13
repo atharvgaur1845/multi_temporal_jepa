@@ -45,6 +45,7 @@ def main():
     # rows[cell] = list of (run_key, value); run_key = (seed, cv_fold) to pair across cells
     rows = defaultdict(list)
     for path in files:
+        n_rows = 0
         with open(path) as f:
             for r in csv.DictReader(f):
                 v = r.get(args.metric, "")
@@ -52,6 +53,11 @@ def main():
                     continue
                 key = (r.get("seed", ""), r.get("cv_fold", ""))
                 rows[r["cell"]].append((key, float(v)))
+                n_rows += 1
+        print(f"    {path}: {n_rows} data row(s)")
+    if not any("__s" in p for p in files):
+        print("    [warn] no seed-tagged CSVs (matrix_results__s*.csv) — this is single-run data, "
+              "not a multi-seed aggregate.")
 
     # per-cell summary (sorted by mean desc)
     summary = {}
