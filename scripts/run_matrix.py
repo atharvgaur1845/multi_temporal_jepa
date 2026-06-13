@@ -45,7 +45,18 @@ def enumerate_cells():
     # 2) horizon study (h1 already covered above)
     for h in (2, 4, 8):
         cells.append((f"tjepa_h{h}", {"objective": "temporal_jepa", "temporal": {"horizon": h}}))
-    # 3) ablations: predictor depth + embed dim (temporal jepa, horizon 1)
+    # 3) ablations (temporal jepa, horizon 1)
+    # 3a) VICReg anti-collapse: noreg (pure I-JEPA, expected to collapse) + coefficient sensitivity
+    cells.append(("tjepa_noreg",
+                  {"objective": "temporal_jepa", "loss": {"var_coeff": 0.0, "cov_coeff": 0.0}}))
+    for vc in (0.5, 2.0):
+        cells.append((f"tjepa_var{vc}",
+                      {"objective": "temporal_jepa", "loss": {"var_coeff": vc}}))
+    # 3b) predictor width (asymmetry bottleneck): 128/256 vs default 384 (all < encoder 512)
+    for pw in (128, 256):
+        cells.append((f"tjepa_pred{pw}",
+                      {"objective": "temporal_jepa", "predictor": {"embed_dim": pw}}))
+    # 3c) predictor depth + encoder embed dim
     for d in (1, 2, 4, 6):
         cells.append((f"tjepa_preddepth{d}",
                       {"objective": "temporal_jepa", "predictor": {"depth": d}}))
@@ -69,7 +80,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/model/tjepa.yaml")
     ap.add_argument("--data", default="configs/data/pastis.yaml")
-    ap.add_argument("--out", default="runs/matrix_results.csv")
+    ap.add_argument("--out", default=None, help="results CSV (default: runs/matrix_results[<tag>].csv)")
     ap.add_argument("--ckpt-dir", default="runs/matrix",
                     help="save each cell's encoder here so test/few-shot eval needs no retrain")
     ap.add_argument("--max-cells", type=int, default=None, help="cap cells (logs the rest as SKIPPED)")
@@ -80,9 +91,22 @@ def main():
     ap.add_argument("--test", action="store_true", help="probe on test_folds (default: val_folds)")
     ap.add_argument("--resume", action="store_true",
                     help="skip cells whose encoder ckpt already exists (continue after a crash)")
+    ap.add_argument("--seed", type=int, default=None,
+                    help="override training seed (for multi-seed error bars; tags outputs)")
+    ap.add_argument("--cv-fold", type=int, default=None, choices=[1, 2, 3, 4, 5],
+                    help="5-fold CV rotation: this fold = TEST (see data.splits.cv_split)")
     args = ap.parse_args()
 
     base = load_yaml(args.config)
+    # seed / CV tagging so multi-seed and per-fold runs write to distinct files and don't collide;
+    # the default (no --seed/--cv-fold) keeps the original unsuffixed paths so existing runs resume.
+    seed = args.seed if args.seed is not None else int(base["log"].get("seed", 0))
+    fold = args.cv_fold
+    is_default = args.seed is None and args.cv_fold is None
+    tag = "" if is_default else "__s{}{}".format(seed, f"_f{fold}" if fold else "")
+    out_path = args.out or f"runs/matrix_results{tag}.csv"
+    base.setdefault("log", {})["seed"] = seed
+
     cells = enumerate_cells()
     run = cells if args.max_cells is None else cells[: args.max_cells]
     skipped = [] if args.max_cells is None else cells[args.max_cells:]
@@ -111,8 +135,15 @@ def main():
 
     data_cfg = load_yaml(args.data)
     device = resolve_device(args.device or base.get("device"))
-    print(f"[run_matrix] device = {device}")
-    os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
+    print(f"[run_matrix] device = {device}  seed = {seed}" + (f"  cv-fold(test) = {fold}" if fold else ""))
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+
+    # 5-fold CV: override the data config's fold assignment for this rotation
+    if fold is not None:
+        from data.splits import cv_split
+        tr_f, va_f, te_f = cv_split(fold)
+        data_cfg["train_folds"], data_cfg["val_folds"], data_cfg["test_folds"] = tr_f, va_f, te_f
+        print(f"[run_matrix] CV fold {fold}: train {tr_f} val {va_f} test {te_f}")
 
     msl = data_cfg.get("max_seq_len")
     eval_folds = data_cfg["test_folds"] if args.test else data_cfg["val_folds"]
@@ -127,15 +158,15 @@ def main():
     probe_tr = PASTIS(data_cfg["root"], folds=data_cfg["train_folds"], return_label=True,
                       norm_mean=mean, norm_std=std, max_seq_len=msl)
 
-    resume_existing = args.resume and os.path.exists(args.out)
-    with open(args.out, "a" if resume_existing else "w", newline="") as f:
+    resume_existing = args.resume and os.path.exists(out_path)
+    with open(out_path, "a" if resume_existing else "w", newline="") as f:
         writer = csv.writer(f)
         if not resume_existing:
-            writer.writerow(["cell", "objective", "eval_split", "miou_linear", "miou_conv",
-                             "knn_acc", "gpu_hours", "peak_mem_gb"])
+            writer.writerow(["cell", "objective", "seed", "cv_fold", "eval_split", "miou_linear",
+                             "miou_conv", "knn_acc", "gpu_hours", "peak_mem_gb"])
         from torch.utils.data import DataLoader as DL
         for name, ov in run:
-            ckpt_path = os.path.join(args.ckpt_dir, f"{name}.pt")
+            ckpt_path = os.path.join(args.ckpt_dir, f"{name}{tag}.pt")
             if args.resume and os.path.exists(ckpt_path):
                 print(f"[run_matrix] {name}: already complete ({ckpt_path}) -> resume skip")
                 continue
@@ -194,15 +225,16 @@ def main():
                 Xev, yev = parcel_embeddings(encoder, el, device=device)
                 knn_acc = round(knn_accuracy(Xtr, ytr, Xev, yev, k=20), 4)
 
-            writer.writerow([name, obj, eval_split, round(mious["linear"], 4),
-                             round(mious["conv"], 4), knn_acc,
+            writer.writerow([name, obj, seed, fold if fold else "", eval_split,
+                             round(mious["linear"], 4), round(mious["conv"], 4), knn_acc,
                              round(stats["gpu_hours"], 3), round(stats["peak_mem_gb"], 2)])
             f.flush()
             # save encoder LAST so its presence means the cell is FULLY done (train+probe+logged)
             # -> --resume can safely skip it on a re-run after a crash/OOM.
             os.makedirs(args.ckpt_dir, exist_ok=True)
             torch.save({"encoder": encoder.state_dict(), "cfg": cfg, "objective": obj,
-                        "use_temporal": use_temporal}, os.path.join(args.ckpt_dir, f"{name}.pt"))
+                        "use_temporal": use_temporal, "seed": seed, "cv_fold": fold},
+                       os.path.join(args.ckpt_dir, f"{name}{tag}.pt"))
             print(f"[run_matrix] {name}: linear={mious['linear']*100:.2f} conv={mious['conv']*100:.2f} "
                   f"knn={knn_acc} gpu_h={stats['gpu_hours']:.2f}")
 

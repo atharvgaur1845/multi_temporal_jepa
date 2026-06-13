@@ -228,7 +228,48 @@ k-NN (val fold): temporal 65.5, spatial 58.7, byol 62.7, simclr 54.6, mae 54.4.
 *Baselines note:* equalized to effective batch 192 (grad-accum). They remain far below
 temporal/spatial — the gap is the objective, not the batch size. (SimCLR's NT-Xent *negatives* are
 still per-micro-batch; a memory bank is out of scope — §8.2.) Numbers vary ~±1–2 mIoU across
-training reruns (cuDNN nondeterminism over 100 epochs); the ranking is stable to it.
+training reruns (cuDNN nondeterminism over 100 epochs); the ranking is stable to it. **These are
+single-seed, single-split numbers; the multi-seed / 5-fold protocol with significance tests (§7.4)
+is the path to error bars.**
+
+### 7.3 Why temporal wins — mechanistic hypotheses (to test)
+
+The result tells us *that* temporal beats spatial; these are testable explanations of *why*,
+ordered by how directly the current pipeline can probe them:
+
+- **H-mech-1: phenology is the signal.** Predicting a future acquisition forces the encoder to
+  model how a parcel *changes* (growth, senescence, harvest); spatial masking only models within-
+  image texture. **Test:** per-class IoU(temporal) − IoU(spatial) should correlate with how
+  phenologically dynamic each crop is. The per-class IoU vectors are already produced by
+  `evaluate.py`; cross-reference them with PASTIS crop calendars.
+- **H-mech-2: temporal features encode time.** **Test (cheap):** linear-probe the frozen features
+  to predict each frame's DOY/month. Temporal-JEPA features should decode acquisition time far
+  better than spatial-JEPA's — direct evidence the representation is temporally structured.
+- **H-mech-3: invariance vs prediction.** Contrastive/BYOL learn *invariance* (collapse nuisance
+  variation), which discards the temporal change that distinguishes crops — consistent with their
+  low scores. **Test:** measure feature variance across time within a parcel; temporal-JEPA should
+  retain more temporal variance than BYOL/SimCLR.
+- **H-mech-4: representation geometry.** Effective rank of temporal features is high (≈430/512 at
+  train, ≈250 at eval-pool); compare against spatial/baselines — richer, higher-rank features
+  should track higher mIoU. (`engine/diagnostics.effective_rank` already computes this.)
+
+These convert the empirical win into a mechanism for the paper's discussion. H-mech-2 is the
+single most convincing and cheapest to run.
+
+### 7.4 Statistical rigor protocol (infrastructure ready; runs pending)
+
+The pipeline now supports the full rigor pass; what remains is GPU time.
+- **Multi-seed:** `run_matrix --seed S` (tags outputs `__s<S>`). Run S∈{0,1,2} (≥3) for at least
+  `tjepa_h1` + `spatial_jepa` (+ baselines if budget allows).
+- **5-fold CV:** `run_matrix --cv-fold F` (F∈1..5, rotates which fold is TEST via
+  `data.splits.cv_split`; tags `__s<S>_f<F>`).
+- **Error bars + significance:** `scripts/aggregate.py` reads all `runs/matrix_results*.csv`,
+  reports per-cell **mean ± std (n)**, and runs **paired Wilcoxon + paired t-test** of the
+  reference cell (temporal) vs each other, matched by (seed, fold). p < 0.05 ⇒ significant.
+- **Tractable plan** (compute is the constraint — full 3 seeds × 5 folds × 22 cells is 100s of
+  GPU-h): do **3 seeds × single split** on the *main 9 cells* first (gives error bars +
+  significance on the headline), then **5-fold × 1 seed** on just `tjepa_h1` + `spatial_jepa` if
+  time allows. Report the rest single-seed and say so.
 
 ---
 
@@ -264,24 +305,36 @@ training reruns (cuDNN nondeterminism over 100 epochs); the ranking is stable to
   --head both --knn --fewshot --test`.
 - Seeds fixed (`utils/seed.py`), checkpoints carry config + RNG state, GPU-hours/peak-memory logged
   per cell. All five objectives selectable via one `objective:` field.
+- **Rigor pass:** `run_matrix --seed S` (multi-seed) / `--cv-fold F` (5-fold CV) — each tags its
+  outputs `runs/matrix_results__s<S>[_f<F>].csv` and `runs/matrix/<cell>__s<S>[_f<F>].pt`. Then
+  `python scripts/aggregate.py` → mean ± std + paired Wilcoxon / t-test vs temporal. Example:
+  `for s in 0 1 2; do python scripts/run_matrix.py --seed $s --max-cells 9 --knn --resume \
+  --config configs/model/tjepa_8gb.yaml --data configs/data/pastis.yaml --device cuda:0; done`.
 
 ---
 
-## 10. Next steps
+## 10. Next steps — status
 
-Done: ✅ equalized baselines (batch 192) ✅ compute-matched spatial JEPA ✅ horizon study (H2)
-✅ test-fold + few-shot numbers (§7).
+**Done (results in §7):** ✅ equalized baselines (batch 192) ✅ compute-matched spatial JEPA
+✅ horizon study (H2) ✅ test-fold + few-shot numbers.
 
-Remaining (optional, for a stronger/fuller paper):
-1. **Ablations** (H4): predictor depth {1,2,4,6}, embed dim {128,256,512,768} — `run_matrix` cells
-   10–17 (`--max-cells 17`). Cheaper at `patch_size 16`.
-2. **Multi-seed runs** to put error bars on the headline (esp. the Δ=8 horizon rebound, and the
-   ±1–2 mIoU baseline variance) — currently single-seed.
-3. **5-fold CV** average instead of a single train/val/test split.
-4. **Feature-space figure** (`scripts/feature_figure.py`) — t-SNE/UMAP of parcel embeddings +
-   cluster purity/silhouette, temporal vs spatial, for the qualitative panel.
-5. SimCLR with a **memory bank** (proper large-negative contrastive) if a stronger contrastive
-   baseline is wanted.
+**Infrastructure built, runs pending (the publication-rigor pass — see §7.4):**
+- ✅ *code* multi-seed (`run_matrix --seed`), 5-fold CV (`--cv-fold`), error bars + Wilcoxon/t-test
+  (`scripts/aggregate.py`). ⬜ *runs*: 3 seeds on the main 9 cells (Tier 1).
+- ✅ *code* VICReg ablation (`tjepa_noreg`/`var0.5`/`var2.0`) + predictor-width ablation
+  (`tjepa_pred128`/`pred256`) + depth/dim ablations — `run_matrix` cells 10–22. ⬜ *runs* (Tier 2).
+- ✅ *code* feature-space figure (`scripts/feature_figure.py`, t-SNE/UMAP + purity/silhouette).
+  ⬜ *run* temporal vs spatial panel (Tier 2).
+
+**Still to design/implement:**
+- **Mechanistic study** (§7.3) — strongly recommend H-mech-2 (probe features → predict DOY/month);
+  cheap and convincing. Needs a small script (extract features → linear-regress DOY).
+- **Additional temporal SSL baseline** (Tier 3) — e.g. TS2Vec-style temporal contrastive or a
+  temporal-order / frame-shuffle pretext on the same encoder. New objective + trainer (~½ day to
+  add); would strengthen "temporal *prediction* beats other temporal SSL", not just spatial.
+- **Second SITS dataset** (TimeSen2Crop / BreizhCrops) and a **fine-tuning** protocol — the main
+  levers to move from workshop- to conference-grade.
+- SimCLR **memory bank** for a stronger contrastive baseline.
 
 ## References
 I-JEPA (Assran 2023, 2301.08243) · V-JEPA (Bardes 2024, 2404.08471) · PASTIS/U-TAE (Garnot &

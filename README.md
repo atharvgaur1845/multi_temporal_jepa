@@ -148,7 +148,9 @@ tests/        unit tests (TDD); test_model_synthetic runs the full wiring withou
 
 ### `scripts/`
 - `download_pastis.sh` (resumable, md5-verified), `overfit8_smoketest.py` (**M1 gate**),
-  `run_matrix.py` (the comparison driver — see §5), `evaluate.py` (load a checkpoint → probe).
+  `run_matrix.py` (the comparison driver, `--seed`/`--cv-fold` for the rigor pass — see §5),
+  `evaluate.py` (load a checkpoint → probe/few-shot/test), `aggregate.py` (multi-seed/fold
+  mean ± std + paired Wilcoxon/t-test), `feature_figure.py` (t-SNE/UMAP qualitative panel).
 
 ---
 
@@ -187,7 +189,8 @@ python scripts/run_matrix.py \
     --config configs/model/tjepa_8gb.yaml --data configs/data/pastis.yaml \
     --device cuda:0 --max-cells 5 --knn --resume
 #   --max-cells 5  = the 5 main objective cells (temporal h1 vs spatial vs MAE/BYOL/SimCLR)
-#   --max-cells 8  = + horizon study (Δ=2,4,8);  omit = full 16-cell matrix (+ ablations)
+#   --max-cells 9  = + compute-matched spatial + horizon study (Δ=2,4,8)
+#   omit / 22      = + ablations (VICReg, predictor width/depth, embed dim)
 #   --resume       = skip cells already done (continue after a crash/OOM)
 #   --test         = probe on test folds instead of val
 
@@ -195,12 +198,24 @@ python scripts/run_matrix.py \
 python scripts/evaluate.py --encoder-ckpt runs/matrix/tjepa_h1.pt \
     --config configs/model/tjepa_8gb.yaml --data configs/data/pastis.yaml \
     --device cuda:0 --head both --knn --fewshot --test
+
+# RIGOR PASS: multi-seed + 5-fold CV (tags outputs), then error bars + significance tests
+for s in 0 1 2; do python scripts/run_matrix.py --seed $s --max-cells 9 --knn --resume \
+    --config configs/model/tjepa_8gb.yaml --data configs/data/pastis.yaml --device cuda:0; done
+python scripts/run_matrix.py --cv-fold 1 ...   # repeat F=1..5 for 5-fold CV
+python scripts/aggregate.py                    # mean ± std + paired Wilcoxon / t-test vs temporal
+
+# qualitative figure: t-SNE of parcel embeddings + cluster purity/silhouette
+python scripts/feature_figure.py --encoder-ckpt runs/matrix/tjepa_h1.pt \
+    --config configs/model/tjepa_8gb.yaml --data configs/data/pastis.yaml \
+    --device cuda:0 --method tsne --out runs/figures/tjepa_h1_tsne.png
 ```
 
 ### Where results are saved
-- `runs/matrix_results.csv` — one row/cell: `cell, objective, eval_split, miou_linear, miou_conv,
-  knn_acc, gpu_hours, peak_mem_gb` (flushed per cell, crash-safe).
-- `runs/matrix/<cell>.pt` — per-cell encoder (reuse for `evaluate.py --encoder-ckpt`, no retrain).
+- `runs/matrix_results[__s<seed>_f<fold>].csv` — one row/cell: `cell, objective, seed, cv_fold,
+  eval_split, miou_linear, miou_conv, knn_acc, gpu_hours, peak_mem_gb` (flushed per cell, crash-safe).
+- `runs/matrix/<cell>[__s<seed>_f<fold>].pt` — per-cell encoder (reuse for `evaluate.py
+  --encoder-ckpt`, no retrain). `scripts/aggregate.py` globs all the CSVs.
 - Redirect console to a log with `> run.log 2>&1` (use `nohup`/`tmux` for long runs).
 
 Single-objective pretrain (instead of the matrix): `python -m engine.train_jepa --config

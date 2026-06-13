@@ -1,0 +1,55 @@
+# Big-GPU server config (~48 GB card, e.g. A6000/A40/L40). Goal: fill the card -> high throughput.
+# SAME quality/comparability as tjepa_8gb.yaml (P8, embed-512, pred-384, EFFECTIVE BATCH 192) — only
+# the per-step batch is large (so far fewer optimizer micro-steps + better GPU utilization).
+# Estimated peak ~30 GB at batch 96 (model: 0.0096*B*T + 0.95, T=32, grad_checkpoint on).
+# RUN THE FIT-CHECK below first and raise/lower batch_size to fill your free memory.
+objective: temporal_jepa
+device: cuda                       # pass --device cuda:1 on the server
+
+encoder:
+  patch_size: 8
+  embed_dim: 512
+  depth: 6
+  num_heads: 8
+  temporal_depth: 4
+  grad_checkpoint: true            # keep on: lets the big batch fit. Turn OFF only if you drop batch
+                                   # a lot (no-checkpoint ~3x memory) — checkpoint+big-batch is the
+                                   # safe way to use the whole card.
+
+predictor:
+  embed_dim: 384
+  depth: 6
+  num_heads: 12
+
+ema:
+  base_momentum: 0.996
+  final_momentum: 1.0
+  schedule: linear
+
+temporal:
+  horizon: 1
+  min_context: 4
+
+loss:
+  type: l2
+  target_layernorm: true
+  stop_grad: true
+  var_coeff: 1.0
+  cov_coeff: 0.04
+
+optim:
+  name: adamw
+  lr: 1.0e-3
+  warmup_epochs: 15
+  min_lr: 1.0e-6
+  weight_decay_start: 0.04
+  weight_decay_end: 0.40
+  epochs: 100
+  batch_size: 96                   # ~30 GB est; raise to 112-128 if nvidia-smi shows room, lower if OOM
+  grad_accum: 2                    # effective batch = 96*2 = 192 (matches existing results)
+  amp: true
+  augment: true
+
+log:
+  diagnostics_every: 50
+  seed: 0
