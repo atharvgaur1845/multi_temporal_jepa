@@ -106,6 +106,7 @@ def train_byol(loader, cfg, device, logger=print):
                 if ostep % cfg["log"].get("diagnostics_every", 50) == 0:
                     logger(f"[byol] opt-step {ostep} loss {loss.item():.4f}")
                 ostep += 1
+        logger(f"[byol] epoch {ep + 1}/{epochs} loss {loss.item():.4f}")
     return online
 
 
@@ -139,6 +140,7 @@ def train_simclr(loader, cfg, device, logger=print):
                 if ostep % cfg["log"].get("diagnostics_every", 50) == 0:
                     logger(f"[simclr] opt-step {ostep} loss {loss.item():.4f}")
                 ostep += 1
+        logger(f"[simclr] epoch {ep + 1}/{epochs} loss {loss.item():.4f}")
     return backbone
 
 
@@ -165,6 +167,7 @@ def train_mae(loader, cfg, device, logger=print):
                 if ostep % cfg["log"].get("diagnostics_every", 50) == 0:
                     logger(f"[mae] opt-step {ostep} loss {loss.item():.4f}")
                 ostep += 1
+        logger(f"[mae] epoch {ep + 1}/{epochs} loss {loss.item():.4f}")
     return backbone
 
 
