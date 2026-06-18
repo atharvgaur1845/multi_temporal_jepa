@@ -186,51 +186,63 @@ All four train the same `SITSEncoder` spatial backbone so the frozen-probe is un
 Frozen-encoder probes, **held-out TEST fold (fold 5)**, conv head, seeded (reproducible to ±0.1
 mIoU). Baselines at equalized effective batch 192 (grad-accum), matching JEPA.
 
-### 7.1 Main comparison (H1, H3) + compute-matched control
+### 7.1 Main comparison (H1, H3) + compute-matched control — 3 seeds, significance
 
-| Method | conv mIoU | few-shot 1% / 5% / 10% | notes |
-|---|---|---|---|
-| **Temporal JEPA (Δ=1)** | **22.1** | **9.2 / 13.1 / 15.9** | the method |
-| Spatial JEPA | 16.1 | 4.6 / 6.9 / 9.5 | direct baseline (I-JEPA on frames) |
-| Spatial JEPA — **compute-matched** (3.5× epochs) | 17.1 | 4.2 / 7.1 / 11.5 | same GPU-h as temporal |
-| SimCLR | 7.1 | 2.3 / 3.9 / 4.3 | contrastive |
-| BYOL | 4.9 | 4.2 / 5.3 / 5.8 | self-distillation |
-| MAE | 3.6 | 2.8 / 3.7 / 3.9 | reconstruction |
-| *Supervised U-TAE (ceiling, not a frozen-probe peer)* | *63.1* | — | end-to-end + decoder |
+Conv mIoU, **val fold, mean ± std over 3 seeds**, with a **paired t-test** vs temporal (Δ=1). The
+single-seed **test-fold** column (right) confirms it generalizes. (n=3 → Wilcoxon can't drop below
+p=0.25 by construction; we report the paired t-test and recommend 5 seeds to also power Wilcoxon.)
 
-k-NN (val fold): temporal 65.5, spatial 58.7, byol 62.7, simclr 54.6, mae 54.4.
+| Method | conv mIoU (val, 3 seeds) | Δ vs temporal | t-test p | conv mIoU (test, 1 seed) |
+|---|---|---|---|---|
+| **Temporal JEPA (Δ=1)** | **22.3 ± 1.8** | — | — | **22.1** |
+| Spatial JEPA | 16.2 ± 0.4 | +6.0 | **0.041** | 16.1 |
+| Spatial JEPA — compute-matched (3.5× epochs) | 15.8 ± 1.2 | +6.5 | **0.036** | 17.1 |
+| SimCLR | 7.3 ± 0.8 | +15.0 | **0.009** | 7.1 |
+| BYOL | 7.1 ± 0.9 | +15.2 | **0.001** | 4.9 |
+| MAE | 6.5 ± 1.1 | +15.8 | **0.009** | 3.6 |
+| *Supervised U-TAE (ceiling, not a frozen-probe peer)* | — | — | — | *63.1* |
+
+All five comparisons are significant at p < 0.05 (paired t-test, n=3 seeds). Few-shot (test, 1 seed):
+temporal 9.2 / 13.1 / 15.9 vs spatial 4.6 / 6.9 / 9.5 at 1/5/10% labels. k-NN (val): temporal 65.5,
+spatial 58.7, byol 62.7, simclr 54.6, mae 54.4.
 
 ### 7.2 Horizon study (H2) — how far ahead can we predict?
 
-| Horizon Δ (acquisition steps) | conv mIoU | few-shot 1% / 5% / 10% |
-|---|---|---|
-| Δ=1 | **22.1** | 9.2 / 13.1 / 15.9 |
-| Δ=2 | 18.8 | 8.1 / 11.3 / 13.4 |
-| Δ=4 | 18.6 | 8.1 / 11.0 / 13.3 |
-| Δ=8 | 21.6 | 8.9 / 12.5 / 15.4 |
+Conv mIoU, val fold, mean ± std over 3 seeds:
+
+| Horizon Δ | conv mIoU (3 seeds) |
+|---|---|
+| Δ=1 | 22.3 ± 1.8 |
+| Δ=2 | 20.8 ± 1.0 |
+| Δ=4 | 21.8 ± 1.0 |
+| Δ=8 | 22.6 ± 1.5 |
+
+**Flat within noise** — all horizons overlap (±1–1.8) and none differs significantly from Δ=1
+(t-test p > 0.1). So mIoU is essentially **horizon-insensitive over Δ=1–8**: temporal JEPA learns
+useful structure whether predicting 1 or 8 acquisitions ahead, and *every* horizon beats spatial
+(16.2). (The apparent Δ=8 "rebound" in the earlier single-seed run was noise.)
 
 ### Findings
-- **H1 supported, and it generalizes.** Temporal beats spatial JEPA on the test fold at every
-  label fraction: **+37%** conv mIoU at full labels (22.1 vs 16.1), widening to **+100%** at 1%
-  (9.2 vs 4.6). Same trainer, same effective batch (192) → cleanest possible comparison.
-- **The win is the objective, not compute.** Spatial JEPA trained **3.5× longer** (matched
-  GPU-hours, 350 epochs) reaches only **17.1** — a +1.0 gain that leaves it **5 points below**
-  temporal. Extra compute does not close the gap.
-- **H2 — robust across horizons.** *Every* horizon (18.6–22.1) beats spatial (16.1) and all
-  baselines. Δ=1 is best; performance is non-monotonic (dip at Δ=2,4, rebound at Δ=8) — plausibly
-  longer horizons forcing longer-range seasonal structure, though confirming this vs run-noise
-  needs multi-seed runs. Headline: predicting even 8 acquisitions ahead still beats spatial.
-- **H3 supported.** Temporal beats MAE/BYOL/SimCLR by a wide margin on every metric — and beats
-  BYOL/SimCLR while using **4–5× less GPU time** (2.1 h vs 7.8–9.9 h).
+- **H1 supported and SIGNIFICANT.** Temporal beats spatial JEPA by **+6.0 mIoU** (22.3 vs 16.2,
+  3-seed mean), **paired t-test p = 0.041**. Same trainer, same effective batch (192) → cleanest
+  comparison. On the test fold the gap widens from +37% (full labels) to **+100% at 1%** (9.2 vs 4.6).
+- **The win is the objective, not compute (significant).** Compute-matched spatial JEPA (3.5×
+  epochs) is **15.8 ± 1.2** — *no better* than standard spatial and **+6.5 mIoU below temporal,
+  p = 0.036**. Extra compute does not close the gap.
+- **H3 supported, strongly significant.** Temporal beats MAE / BYOL / SimCLR by **+15–16 mIoU**
+  (p = 0.001–0.009) — and beats BYOL/SimCLR while using **4–5× less GPU time**.
+- **H2 — horizon-insensitive.** Δ=1/2/4/8 = 22.3/20.8/21.8/22.6 (3-seed); all overlap within noise,
+  none differs from Δ=1 (p > 0.1), and every horizon beats spatial. Temporal learns useful
+  structure whether predicting 1 or 8 acquisitions ahead. (The earlier single-seed Δ=8 "rebound"
+  was noise.)
 - **Data-efficiency.** The temporal advantage *grows* as labels shrink — the SSL story.
 - **Consistent across three independent probes** (dense mIoU, k-NN, few-shot) → credible.
 
-*Baselines note:* equalized to effective batch 192 (grad-accum). They remain far below
-temporal/spatial — the gap is the objective, not the batch size. (SimCLR's NT-Xent *negatives* are
-still per-micro-batch; a memory bank is out of scope — §8.2.) Numbers vary ~±1–2 mIoU across
-training reruns (cuDNN nondeterminism over 100 epochs); the ranking is stable to it. **These are
-single-seed, single-split numbers; the multi-seed / 5-fold protocol with significance tests (§7.4)
-is the path to error bars.**
+*Statistics note:* paired t-test over 3 seeds (matched per seed). **Wilcoxon is uninformative at
+n=3** (its minimum two-sided p is 0.25), so it is *not* evidence against significance — run **5
+seeds** to also power the nonparametric test and tighten the t-test. *Baselines note:* equalized to
+effective batch 192; the gap is the objective, not batch size (SimCLR negatives still
+per-micro-batch — §8.2).
 
 ### 7.3 Why temporal wins — mechanistic hypotheses (to test)
 
@@ -242,9 +254,15 @@ ordered by how directly the current pipeline can probe them:
   image texture. **Test:** per-class IoU(temporal) − IoU(spatial) should correlate with how
   phenologically dynamic each crop is. The per-class IoU vectors are already produced by
   `evaluate.py`; cross-reference them with PASTIS crop calendars.
-- **H-mech-2: temporal features encode time.** **Test (cheap):** linear-probe the frozen features
-  to predict each frame's DOY/month. Temporal-JEPA features should decode acquisition time far
-  better than spatial-JEPA's — direct evidence the representation is temporally structured.
+- **H-mech-2: temporal features encode time.** ✅ *implemented* — `scripts/mechanistic.py` probes
+  the frozen **spatial** features (`encode_full`, NOT the temporal pathway — that adds an explicit
+  DOY encoding and would be circular) to decode acquisition time: month classification (12-class;
+  chance 8.3%) + circular DOY regression (mean error in days). Run it on the temporal vs spatial
+  encoders side by side:
+  `python scripts/mechanistic.py --encoder-ckpt runs/matrix/tjepa_h1.pt runs/matrix/spatial_jepa.pt
+  --config configs/model/tjepa_8gb.yaml --data configs/data/pastis.yaml`. If temporal's month-acc
+  is higher / DOY-MAE lower, that is direct evidence the temporal objective made the *spatial*
+  representation phenology/season-aware.
 - **H-mech-3: invariance vs prediction.** Contrastive/BYOL learn *invariance* (collapse nuisance
   variation), which discards the temporal change that distinguishes crops — consistent with their
   low scores. **Test:** measure feature variance across time within a parcel; temporal-JEPA should
