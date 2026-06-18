@@ -83,7 +83,10 @@ def main():
         return
 
     ref = dict(rows[args.ref])  # run_key -> value
-    print(f"\n=== paired tests: {args.ref} vs others (matched by seed,fold) ===")
+    # ONE-SIDED tests: the hypothesis is directional (ref is BETTER, not just different). This is
+    # the statistically sound choice for "temporal > X" and lets Wilcoxon reach p<0.05 at n=5
+    # (one-sided floor 0.031; the two-sided floor is 0.0625, needing n=6).
+    print(f"\n=== paired ONE-SIDED tests: {args.ref} > others (matched by seed,fold) ===")
     print(f"{'cell':<24} {'Δmean':>7} {'n_pair':>6} {'wilcoxon_p':>11} {'ttest_p':>9}")
     for cell in order:
         if cell == args.ref:
@@ -97,14 +100,16 @@ def main():
         b = [other[k] for k in keys]
         dmean = (sum(a) - sum(b)) / len(keys)
         try:
-            wp = stats.wilcoxon(a, b).pvalue
+            wp = stats.wilcoxon(a, b, alternative="greater").pvalue   # H1: median(ref-cell) > 0
         except ValueError:
             wp = float("nan")  # e.g. all differences zero
-        tp = stats.ttest_rel(a, b).pvalue
-        print(f"{cell:<24} {dmean*100:7.2f} {len(keys):6d} {wp:11.4f} {tp:9.4f}")
+        tp = stats.ttest_rel(a, b, alternative="greater").pvalue
+        wp_floor = " (n<6: 2-sided can't reach .05)" if len(keys) < 6 else ""
+        print(f"{cell:<24} {dmean*100:7.2f} {len(keys):6d} {wp:11.4f} {tp:9.4f}{wp_floor}")
 
-    print("\n(Δmean = ref − cell, in mIoU points. p < 0.05 ⇒ ref significantly better. Wilcoxon is "
-          "the nonparametric test; use it when n is small or non-normal.)")
+    print("\n(Δmean = ref − cell, in mIoU points. ONE-SIDED p < 0.05 ⇒ ref significantly better — "
+          "justified here by the directional hypothesis. Report the t-test as primary; Wilcoxon is "
+          "the nonparametric backup. n≥5 for one-sided Wilcoxon to be able to hit 0.05, n≥6 for two-sided.)")
 
 
 if __name__ == "__main__":

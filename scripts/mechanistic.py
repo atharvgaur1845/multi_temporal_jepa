@@ -76,7 +76,7 @@ def evaluate_encoder(name, enc, tr_loader, ev_loader, device):
     # month classification (12 classes); chance = 1/12
     mtr = np.clip((ytr - 1) * 12 // 366, 0, 11)
     mev = np.clip((yev - 1) * 12 // 366, 0, 11)
-    clf = LogisticRegression(max_iter=300, C=1.0).fit(Xtr, mtr)  # multinomial by default
+    clf = LogisticRegression(max_iter=1000, C=1.0).fit(Xtr, mtr)  # multinomial by default
     month_acc = (clf.predict(Xev) == mev).mean()
 
     # circular DOY regression: predict (sin, cos), report mean angular error in days

@@ -247,7 +247,22 @@ per-micro-batch — §8.2).
 ### 7.3 Why temporal wins — mechanistic hypotheses (to test)
 
 The result tells us *that* temporal beats spatial; these are testable explanations of *why*,
-ordered by how directly the current pipeline can probe them:
+ordered by how directly the current pipeline can probe them.
+
+**Result — H-mech-2 confirmed (the mechanism).** Probing the frozen **spatial** features
+(`encode_full`, no temporal pos) to decode acquisition time from a *single frame* (val fold,
+seed 0, `scripts/mechanistic.py`):
+
+| Encoder | month-acc (chance 8.3%) | DOY circular MAE |
+|---|---|---|
+| **Temporal JEPA (Δ=1)** | **61.3%** | **30.4 days** |
+| Spatial JEPA | 46.3% | 41.8 days |
+
+Temporal-JEPA's spatial features decode the acquisition month **+15 points** better (61% vs 46%)
+and the day-of-year ~11 days more accurately. Since crops are separated by **phenological stage**
+(which tracks time), this is direct evidence that the future-prediction objective made the spatial
+representation phenology/season-aware — the *mechanism* behind the downstream segmentation win
+(§7.1). The other hypotheses below remain to test.
 
 - **H-mech-1: phenology is the signal.** Predicting a future acquisition forces the encoder to
   model how a parcel *changes* (growth, senescence, harvest); spatial masking only models within-
