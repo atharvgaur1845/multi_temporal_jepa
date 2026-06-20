@@ -1,0 +1,11 @@
+# S&P-500 sector panel (download via scripts/download_finance.py -> data_root/FINANCE/panel.npz;
+# falls back to a synthetic regime-switching market if the file is absent).
+root: data_root/FINANCE
+window: 64                # trading-day window length per sample (~3 months)
+train_stride: 1           # dense windows for pretraining
+eval_stride: 5            # decorrelate probe windows (~weekly) so metric n isn't inflated by overlap
+train_end: 20171231       # temporal split: train <= 2017, test >= 2018 (with a purge gap)
+vol_horizon: 20           # forward realized-vol target horizon (days)
+anom_horizon: 5           # forward window for the crash/stress anomaly label (days)
+num_regimes: 4
+allow_synth: true         # use the synthetic panel if panel.npz is missing

@@ -242,7 +242,61 @@ PASTIS_ROOT=/path/to/PASTIS pytest -q       # also runs test_dataset + test_prob
 
 ---
 
-## 7. Reference
+## 7. Phase 2 — Financial time series (S&P-500)
+
+A second modality that tests whether the **same** temporal-JEPA objective wins beyond satellites.
+A market is a cross-section of assets observed over time — structurally identical to PASTIS (a
+cross-section of pixels observed over time) — so the method ports almost 1:1. Full write-up:
+**[report_finance.md](report_finance.md)**.
+
+```
+S&P sector panel X[W,N,F]  (W=64 trading days, N=9 sector ETFs, F=4 features) + DOY dates
+   │  causal split by trading day → context = past days | target = future day (horizon Δ)
+   ▼
+per-day FrameEmbed (Linear F→D) + LEARNED per-asset pos + DOY temporal pos
+   ├─► cross-asset ViT (within a day) → temporal transformer (across days) → z_ctx
+   │        PREDICTOR (narrow) : z_ctx + mask tokens(future asset-pos + DOY) → ẑ_future
+   └─► TARGET (EMA, stop-grad): encode FUTURE day → z_future ;  Loss = ‖ẑ−sg(LN(z))‖² + var/cov reg
+```
+
+**Reused unchanged** (modality-agnostic): Predictor, JEPA latent loss + VICReg, EMA, diagnostics,
+ViT/temporal transformer stacks. **Swapped**: Conv2d patch-embed → `Linear(F→D)` per asset-day;
+2D sin/cos spatial pos → learned per-asset pos (`models/finance_encoder.py`, `models/finance_jepa.py`).
+The satellite code in §2 is untouched.
+
+**Five downstream tasks** (frozen encoder, train-period probe → test-period score; `eval/finance_tasks.py`):
+regime classification (acc/F1), volatility prediction (R²/IC), anomaly detection (AUROC/AP),
+clustering (NMI/ARI), next-day forecasting (dir-acc/IC). Question: does Temporal JEPA beat Spatial
+JEPA / MAE / BYOL / SimCLR **here too**? A random-init encoder is the floor control.
+
+> **Headline (real S&P sectors, out-of-time test 2018–2026): NO — and it inverts.** Temporal JEPA
+> beats *Spatial* JEPA (7/10 metrics, as on satellites) but **loses to MAE/BYOL/SimCLR**, and — the
+> kicker — **no SSL method beats a plain linear probe on the raw features**, while Temporal JEPA falls
+> *below* its own random initialization (regime acc 0.61 trained vs 0.80 untrained; worse at longer
+> horizons). The temporal-prediction advantage is **modality-specific**: it shines on stationary crop
+> phenology, not on non-stationary near-efficient markets. An honest negative/inverted-transfer result
+> — controls (random-init, raw-features) confirm it's real, not under-tuning. Full table:
+> **[report_finance.md](report_finance.md) §5**.
+
+```bash
+python scripts/download_finance.py                       # real S&P sector panel via Yahoo (cookie+crumb);
+                                                         # auto-falls back to a synthetic regime market offline
+python scripts/run_finance_matrix.py --config configs/model/fjepa.yaml \
+       --data configs/data/finance.yaml --device cuda:0  # pretrain+freeze+eval all 9 cells -> runs/finance_results.csv
+python scripts/aggregate_finance.py                      # comparison table + per-task verdict (Temporal vs peers)
+python scripts/finance_smoketest.py --device cuda:0      # M1 gate: loss↓ while std/eff-rank stay healthy
+pytest tests/test_finance_*.py -q                        # 16 tests, fully offline (synthetic panel)
+```
+
+Finance modules: `data/finance_dataset.py` (panel windows, features, labels, temporal split,
+synthetic fallback) · `models/finance_encoder.py` + `models/finance_jepa.py` · `masking/asset_mask.py`
+(cross-sectional masking for Spatial JEPA) · `engine/train_finance.py` (JEPA + MAE/BYOL/SimCLR) ·
+`eval/finance_tasks.py` · `scripts/{download_finance,run_finance_matrix,aggregate_finance,finance_smoketest}.py`
+· `configs/model/fjepa.yaml`, `configs/data/finance.yaml`.
+
+---
+
+## 8. Reference
 
 I-JEPA (Assran 2023, 2301.08243) · V-JEPA (Bardes 2024, 2404.08471) · PASTIS/U-TAE (ICCV 2021,
 2107.07933; Zenodo 10.5281/zenodo.5012942) · MAE (2111.06377) · BYOL (2006.07733) ·

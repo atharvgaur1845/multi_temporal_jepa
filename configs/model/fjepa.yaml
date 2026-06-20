@@ -1,0 +1,51 @@
+# Finance JEPA config (the markets analogue of tjepa_8gb.yaml). The panel is tiny vs PASTIS
+# (N=9 assets, F=4 features, W=64 days), so the encoder is small and training is fast (CPU-runnable).
+# Same anti-collapse stack (EMA target + stop-grad + narrow predictor + VICReg var/cov) as satellite.
+objective: temporal_jepa
+device: cuda
+
+encoder:
+  embed_dim: 128
+  depth: 4                 # cross-asset (per-day) ViT depth
+  num_heads: 4
+  temporal_depth: 4        # across-day temporal transformer depth
+  grad_checkpoint: false
+
+predictor:
+  embed_dim: 64            # narrower than encoder (128) — asymmetry bottleneck
+  depth: 4
+  num_heads: 4
+
+ema:
+  base_momentum: 0.996
+  final_momentum: 1.0
+  schedule: linear
+
+temporal:
+  horizon: 1               # predict the next trading day's latent
+  min_context: 8           # at least 8 past days before the target
+
+loss:
+  type: l2
+  target_layernorm: true
+  stop_grad: true
+  var_coeff: 1.0           # VICReg variance hinge (set 0 to recover pure I-JEPA -> collapses)
+  cov_coeff: 0.04
+
+optim:
+  name: adamw
+  lr: 5.0e-4
+  warmup_epochs: 5
+  min_lr: 1.0e-6
+  weight_decay_start: 0.04
+  weight_decay_end: 0.40
+  epochs: 50
+  batch_size: 128
+  grad_accum: 1
+  amp: true
+  augment: true
+  jitter: 0.05             # std of additive feature noise (label-free pretraining aug)
+
+log:
+  diagnostics_every: 50
+  seed: 0

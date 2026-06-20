@@ -1,0 +1,378 @@
+[run_finance] 9 cells; running 9; skipping 0
+[run_finance] device=cuda:0 seed=0 source=yahoo assets=9 feats=4 train_windows=4698 test_windows=2044
+[temporal_jepa] step 0 loss 2.0706 lr 0.00e+00 std 0.226 effrank 5.2 varratio 0.089
+[temporal_jepa] step 50 loss 1.2263 lr 1.39e-04 std 0.598 effrank 6.1 varratio 0.024
+[temporal_jepa] step 100 loss 0.9141 lr 2.78e-04 std 0.779 effrank 13.4 varratio 0.031
+[temporal_jepa] step 150 loss 0.6486 lr 4.17e-04 std 0.924 effrank 29.0 varratio 0.054
+[temporal_jepa] step 200 loss 0.5464 lr 5.00e-04 std 0.967 effrank 42.5 varratio 0.047
+[temporal_jepa] step 250 loss 0.4023 lr 4.98e-04 std 1.000 effrank 54.6 varratio 0.065
+[temporal_jepa] step 300 loss 0.3266 lr 4.93e-04 std 1.009 effrank 65.3 varratio 0.045
+[temporal_jepa] step 350 loss 0.2825 lr 4.87e-04 std 1.014 effrank 72.8 varratio 0.062
+[temporal_jepa] step 400 loss 0.2622 lr 4.78e-04 std 1.024 effrank 80.5 varratio 0.086
+[temporal_jepa] step 450 loss 0.2558 lr 4.67e-04 std 1.027 effrank 87.6 varratio 0.068
+[temporal_jepa] step 500 loss 0.2602 lr 4.53e-04 std 1.033 effrank 91.9 varratio 0.036
+[temporal_jepa] step 550 loss 0.2191 lr 4.38e-04 std 1.028 effrank 97.0 varratio 0.049
+[temporal_jepa] step 600 loss 0.1810 lr 4.22e-04 std 1.029 effrank 98.9 varratio 0.041
+[temporal_jepa] step 650 loss 0.1800 lr 4.03e-04 std 1.032 effrank 103.1 varratio 0.042
+[temporal_jepa] step 700 loss 0.1670 lr 3.84e-04 std 1.037 effrank 104.9 varratio 0.062
+[temporal_jepa] step 750 loss 0.1726 lr 3.62e-04 std 1.038 effrank 107.4 varratio 0.064
+[temporal_jepa] step 800 loss 0.1354 lr 3.40e-04 std 1.038 effrank 109.6 varratio 0.074
+[temporal_jepa] step 850 loss 0.1552 lr 3.17e-04 std 1.038 effrank 109.9 varratio 0.053
+[temporal_jepa] step 900 loss 0.1815 lr 2.94e-04 std 1.036 effrank 112.0 varratio 0.050
+[temporal_jepa] step 950 loss 0.1901 lr 2.70e-04 std 1.037 effrank 112.5 varratio 0.038
+[temporal_jepa] step 1000 loss 0.1855 lr 2.46e-04 std 1.039 effrank 113.3 varratio 0.034
+[temporal_jepa] step 1050 loss 0.1694 lr 2.22e-04 std 1.038 effrank 113.1 varratio 0.030
+[temporal_jepa] step 1100 loss 0.1550 lr 1.98e-04 std 1.037 effrank 114.7 varratio 0.046
+[temporal_jepa] step 1150 loss 0.1953 lr 1.74e-04 std 1.037 effrank 115.4 varratio 0.046
+[temporal_jepa] step 1200 loss 0.1565 lr 1.52e-04 std 1.038 effrank 115.7 varratio 0.050
+[temporal_jepa] step 1250 loss 0.1733 lr 1.30e-04 std 1.037 effrank 116.1 varratio 0.051
+[temporal_jepa] step 1300 loss 0.1882 lr 1.09e-04 std 1.036 effrank 116.9 varratio 0.033
+[temporal_jepa] step 1350 loss 0.1850 lr 9.01e-05 std 1.035 effrank 116.6 varratio 0.032
+[temporal_jepa] step 1400 loss 0.1467 lr 7.24e-05 std 1.034 effrank 117.1 varratio 0.047
+[temporal_jepa] step 1450 loss 0.1740 lr 5.63e-05 std 1.035 effrank 118.1 varratio 0.031
+[temporal_jepa] step 1500 loss 0.1082 lr 4.20e-05 std 1.031 effrank 117.2 varratio 0.087
+[temporal_jepa] step 1550 loss 0.1516 lr 2.98e-05 std 1.037 effrank 117.7 varratio 0.054
+[temporal_jepa] step 1600 loss 0.1068 lr 1.95e-05 std 1.035 effrank 118.4 varratio 0.068
+[temporal_jepa] step 1650 loss 0.1622 lr 1.15e-05 std 1.033 effrank 117.6 varratio 0.042
+[temporal_jepa] step 1700 loss 0.1331 lr 5.68e-06 std 1.036 effrank 118.0 varratio 0.040
+[temporal_jepa] step 1750 loss 0.1457 lr 2.17e-06 std 1.033 effrank 118.4 varratio 0.035
+[run_finance] tjepa_h1: regime_acc=0.609 vol_r2=-0.228 anom_auroc=0.745 clust_nmi=0.157 fcast_ic=0.085 gpu_h=0.119
+[spatial_jepa] step 0 loss 2.0862 lr 0.00e+00 std 0.682 effrank 5.6 varratio 0.174
+[spatial_jepa] step 50 loss 1.0821 lr 1.39e-04 std 0.729 effrank 10.5 varratio 0.109
+[spatial_jepa] step 100 loss 0.6124 lr 2.78e-04 std 0.947 effrank 31.5 varratio 0.170
+[spatial_jepa] step 150 loss 0.4820 lr 4.17e-04 std 0.988 effrank 51.0 varratio 0.293
+[spatial_jepa] step 200 loss 0.4293 lr 5.00e-04 std 1.007 effrank 63.5 varratio 0.342
+[spatial_jepa] step 250 loss 0.5336 lr 4.98e-04 std 1.015 effrank 71.1 varratio 0.293
+[spatial_jepa] step 300 loss 0.6070 lr 4.93e-04 std 1.020 effrank 76.9 varratio 0.230
+[spatial_jepa] step 350 loss 0.6762 lr 4.87e-04 std 1.026 effrank 81.4 varratio 0.227
+[spatial_jepa] step 400 loss 0.7410 lr 4.78e-04 std 1.028 effrank 84.2 varratio 0.211
+[spatial_jepa] step 450 loss 0.7852 lr 4.67e-04 std 1.033 effrank 89.3 varratio 0.182
+[spatial_jepa] step 500 loss 0.8290 lr 4.53e-04 std 1.034 effrank 90.2 varratio 0.166
+[spatial_jepa] step 550 loss 0.8358 lr 4.38e-04 std 1.037 effrank 95.1 varratio 0.155
+[spatial_jepa] step 600 loss 0.8273 lr 4.22e-04 std 1.037 effrank 95.7 varratio 0.164
+[spatial_jepa] step 650 loss 0.8561 lr 4.03e-04 std 1.038 effrank 96.9 varratio 0.142
+[spatial_jepa] step 700 loss 0.8634 lr 3.84e-04 std 1.038 effrank 98.6 varratio 0.138
+[spatial_jepa] step 750 loss 0.8563 lr 3.62e-04 std 1.039 effrank 100.4 varratio 0.136
+[spatial_jepa] step 800 loss 0.8932 lr 3.40e-04 std 1.039 effrank 101.5 varratio 0.121
+[spatial_jepa] step 850 loss 0.8711 lr 3.17e-04 std 1.038 effrank 102.1 varratio 0.131
+[spatial_jepa] step 900 loss 0.8734 lr 2.94e-04 std 1.037 effrank 102.1 varratio 0.131
+[spatial_jepa] step 950 loss 0.8590 lr 2.70e-04 std 1.038 effrank 103.8 varratio 0.130
+[spatial_jepa] step 1000 loss 0.8918 lr 2.46e-04 std 1.038 effrank 103.3 varratio 0.122
+[spatial_jepa] step 1050 loss 0.8974 lr 2.22e-04 std 1.036 effrank 103.9 varratio 0.117
+[spatial_jepa] step 1100 loss 0.8781 lr 1.98e-04 std 1.037 effrank 106.1 varratio 0.117
+[spatial_jepa] step 1150 loss 0.8947 lr 1.74e-04 std 1.035 effrank 105.7 varratio 0.121
+[spatial_jepa] step 1200 loss 0.8791 lr 1.52e-04 std 1.035 effrank 107.0 varratio 0.118
+[spatial_jepa] step 1250 loss 0.8753 lr 1.30e-04 std 1.034 effrank 106.9 varratio 0.119
+[spatial_jepa] step 1300 loss 0.8818 lr 1.09e-04 std 1.034 effrank 108.0 varratio 0.113
+[spatial_jepa] step 1350 loss 0.8796 lr 9.01e-05 std 1.033 effrank 107.8 varratio 0.119
+[spatial_jepa] step 1400 loss 0.8927 lr 7.24e-05 std 1.034 effrank 108.7 varratio 0.112
+[spatial_jepa] step 1450 loss 0.8812 lr 5.63e-05 std 1.033 effrank 108.3 varratio 0.121
+[spatial_jepa] step 1500 loss 0.8774 lr 4.20e-05 std 1.033 effrank 106.9 varratio 0.124
+[spatial_jepa] step 1550 loss 0.8891 lr 2.98e-05 std 1.032 effrank 106.7 varratio 0.120
+[spatial_jepa] step 1600 loss 0.8708 lr 1.95e-05 std 1.032 effrank 109.5 varratio 0.116
+[spatial_jepa] step 1650 loss 0.8670 lr 1.15e-05 std 1.032 effrank 108.2 varratio 0.121
+[spatial_jepa] step 1700 loss 0.8788 lr 5.68e-06 std 1.032 effrank 107.7 varratio 0.119
+[spatial_jepa] step 1750 loss 0.9015 lr 2.17e-06 std 1.032 effrank 106.9 varratio 0.108
+[run_finance] spatial_jepa: regime_acc=0.758 vol_r2=-0.435 anom_auroc=0.553 clust_nmi=0.132 fcast_ic=0.045 gpu_h=0.005
+[mae] opt-step 0 loss 0.9795
+[mae] epoch 1/50 loss 0.7252
+[mae] opt-step 50 loss 0.6807
+[mae] epoch 2/50 loss 0.4911
+[mae] opt-step 100 loss 0.5528
+[mae] epoch 3/50 loss 0.4855
+[mae] epoch 4/50 loss 0.4792
+[mae] opt-step 150 loss 0.4610
+[mae] epoch 5/50 loss 0.5748
+[mae] opt-step 200 loss 0.6430
+[mae] epoch 6/50 loss 0.4824
+[mae] opt-step 250 loss 0.4900
+[mae] epoch 7/50 loss 0.4949
+[mae] epoch 8/50 loss 0.5676
+[mae] opt-step 300 loss 0.4960
+[mae] epoch 9/50 loss 0.5445
+[mae] opt-step 350 loss 0.4565
+[mae] epoch 10/50 loss 0.4832
+[mae] epoch 11/50 loss 0.4847
+[mae] opt-step 400 loss 0.5068
+[mae] epoch 12/50 loss 0.4335
+[mae] opt-step 450 loss 0.4127
+[mae] epoch 13/50 loss 0.6664
+[mae] opt-step 500 loss 0.4815
+[mae] epoch 14/50 loss 0.5638
+[mae] epoch 15/50 loss 0.5370
+[mae] opt-step 550 loss 0.4347
+[mae] epoch 16/50 loss 0.5264
+[mae] opt-step 600 loss 0.6074
+[mae] epoch 17/50 loss 0.4798
+[mae] epoch 18/50 loss 0.6204
+[mae] opt-step 650 loss 0.4609
+[mae] epoch 19/50 loss 0.5252
+[mae] opt-step 700 loss 0.5138
+[mae] epoch 20/50 loss 0.4211
+[mae] opt-step 750 loss 0.4424
+[mae] epoch 21/50 loss 0.6023
+[mae] epoch 22/50 loss 0.4491
+[mae] opt-step 800 loss 0.4610
+[mae] epoch 23/50 loss 0.5484
+[mae] opt-step 850 loss 0.5215
+[mae] epoch 24/50 loss 0.4974
+[mae] epoch 25/50 loss 0.5309
+[mae] opt-step 900 loss 0.4884
+[mae] epoch 26/50 loss 0.4093
+[mae] opt-step 950 loss 0.5336
+[mae] epoch 27/50 loss 0.5114
+[mae] opt-step 1000 loss 0.4874
+[mae] epoch 28/50 loss 0.3855
+[mae] epoch 29/50 loss 0.5481
+[mae] opt-step 1050 loss 0.6085
+[mae] epoch 30/50 loss 0.4399
+[mae] opt-step 1100 loss 0.6084
+[mae] epoch 31/50 loss 0.5481
+[mae] opt-step 1150 loss 0.5042
+[mae] epoch 32/50 loss 0.5366
+[mae] epoch 33/50 loss 0.4662
+[mae] opt-step 1200 loss 0.4573
+[mae] epoch 34/50 loss 0.4901
+[mae] opt-step 1250 loss 0.6267
+[mae] epoch 35/50 loss 0.5928
+[mae] epoch 36/50 loss 0.7270
+[mae] opt-step 1300 loss 0.4437
+[mae] epoch 37/50 loss 0.7624
+[mae] opt-step 1350 loss 0.5394
+[mae] epoch 38/50 loss 0.6744
+[mae] opt-step 1400 loss 0.4577
+[mae] epoch 39/50 loss 0.3629
+[mae] epoch 40/50 loss 0.5794
+[mae] opt-step 1450 loss 0.4710
+[mae] epoch 41/50 loss 0.4452
+[mae] opt-step 1500 loss 0.4732
+[mae] epoch 42/50 loss 0.4352
+[mae] epoch 43/50 loss 0.5155
+[mae] opt-step 1550 loss 0.5439
+[mae] epoch 44/50 loss 0.4582
+[mae] opt-step 1600 loss 0.5518
+[mae] epoch 45/50 loss 0.4721
+[mae] opt-step 1650 loss 0.4550
+[mae] epoch 46/50 loss 0.4954
+[mae] epoch 47/50 loss 0.4833
+[mae] opt-step 1700 loss 0.4527
+[mae] epoch 48/50 loss 0.4946
+[mae] opt-step 1750 loss 0.4845
+[mae] epoch 49/50 loss 0.4105
+[mae] epoch 50/50 loss 0.4830
+[run_finance] mae: regime_acc=0.797 vol_r2=0.157 anom_auroc=0.836 clust_nmi=0.332 fcast_ic=0.076 gpu_h=0.002
+[byol] epoch 1/50 loss 0.1389
+[byol] epoch 2/50 loss 0.0559
+[byol] epoch 3/50 loss 0.0547
+[byol] epoch 4/50 loss 0.0362
+[byol] epoch 5/50 loss 0.0270
+[byol] epoch 6/50 loss 0.0201
+[byol] epoch 7/50 loss 0.0202
+[byol] epoch 8/50 loss 0.0163
+[byol] epoch 9/50 loss 0.0199
+[byol] epoch 10/50 loss 0.0206
+[byol] epoch 11/50 loss 0.0145
+[byol] epoch 12/50 loss 0.0187
+[byol] epoch 13/50 loss 0.0144
+[byol] epoch 14/50 loss 0.0199
+[byol] epoch 15/50 loss 0.0149
+[byol] epoch 16/50 loss 0.0197
+[byol] epoch 17/50 loss 0.0142
+[byol] epoch 18/50 loss 0.0132
+[byol] epoch 19/50 loss 0.0116
+[byol] epoch 20/50 loss 0.0138
+[byol] epoch 21/50 loss 0.0159
+[byol] epoch 22/50 loss 0.0134
+[byol] epoch 23/50 loss 0.0128
+[byol] epoch 24/50 loss 0.0135
+[byol] epoch 25/50 loss 0.0160
+[byol] epoch 26/50 loss 0.0121
+[byol] epoch 27/50 loss 0.0201
+[byol] epoch 28/50 loss 0.0146
+[byol] epoch 29/50 loss 0.0143
+[byol] epoch 30/50 loss 0.0183
+[byol] epoch 31/50 loss 0.0129
+[byol] epoch 32/50 loss 0.0149
+[byol] epoch 33/50 loss 0.0165
+[byol] epoch 34/50 loss 0.0125
+[byol] epoch 35/50 loss 0.0146
+[byol] epoch 36/50 loss 0.0121
+[byol] epoch 37/50 loss 0.0146
+[byol] epoch 38/50 loss 0.0127
+[byol] epoch 39/50 loss 0.0187
+[byol] epoch 40/50 loss 0.0154
+[byol] epoch 41/50 loss 0.0141
+[byol] epoch 42/50 loss 0.0129
+[byol] epoch 43/50 loss 0.0156
+[byol] epoch 44/50 loss 0.0136
+[byol] epoch 45/50 loss 0.0143
+[byol] epoch 46/50 loss 0.0126
+[byol] epoch 47/50 loss 0.0162
+[byol] epoch 48/50 loss 0.0135
+[byol] epoch 49/50 loss 0.0119
+[byol] epoch 50/50 loss 0.0117
+[run_finance] byol: regime_acc=0.787 vol_r2=0.181 anom_auroc=0.738 clust_nmi=0.367 fcast_ic=0.094 gpu_h=0.256
+[simclr] epoch 1/50 loss 4.0455
+[simclr] epoch 2/50 loss 3.9756
+[simclr] epoch 3/50 loss 3.9202
+[simclr] epoch 4/50 loss 3.8557
+[simclr] epoch 5/50 loss 3.8530
+[simclr] epoch 6/50 loss 3.8322
+[simclr] epoch 7/50 loss 3.7860
+[simclr] epoch 8/50 loss 3.7862
+[simclr] epoch 9/50 loss 3.7847
+[simclr] epoch 10/50 loss 3.7878
+[simclr] epoch 11/50 loss 3.7544
+[simclr] epoch 12/50 loss 3.7522
+[simclr] epoch 13/50 loss 3.7297
+[simclr] epoch 14/50 loss 3.7647
+[simclr] epoch 15/50 loss 3.7114
+[simclr] epoch 16/50 loss 3.7229
+[simclr] epoch 17/50 loss 3.7068
+[simclr] epoch 18/50 loss 3.7057
+[simclr] epoch 19/50 loss 3.7042
+[simclr] epoch 20/50 loss 3.6999
+[simclr] epoch 21/50 loss 3.6725
+[simclr] epoch 22/50 loss 3.6944
+[simclr] epoch 23/50 loss 3.6674
+[simclr] epoch 24/50 loss 3.6855
+[simclr] epoch 25/50 loss 3.6682
+[simclr] epoch 26/50 loss 3.6641
+[simclr] epoch 27/50 loss 3.6612
+[simclr] epoch 28/50 loss 3.6877
+[simclr] epoch 29/50 loss 3.6766
+[simclr] epoch 30/50 loss 3.6713
+[simclr] epoch 31/50 loss 3.6578
+[simclr] epoch 32/50 loss 3.6663
+[simclr] epoch 33/50 loss 3.6753
+[simclr] epoch 34/50 loss 3.6680
+[simclr] epoch 35/50 loss 3.6585
+[simclr] epoch 36/50 loss 3.6667
+[simclr] epoch 37/50 loss 3.6543
+[simclr] epoch 38/50 loss 3.6384
+[simclr] epoch 39/50 loss 3.6625
+[simclr] epoch 40/50 loss 3.6609
+[simclr] epoch 41/50 loss 3.6668
+[simclr] epoch 42/50 loss 3.6624
+[simclr] epoch 43/50 loss 3.6508
+[simclr] epoch 44/50 loss 3.6574
+[simclr] epoch 45/50 loss 3.6576
+[simclr] epoch 46/50 loss 3.6424
+[simclr] epoch 47/50 loss 3.6453
+[simclr] epoch 48/50 loss 3.6390
+[simclr] epoch 49/50 loss 3.6516
+[simclr] epoch 50/50 loss 3.6396
+[run_finance] simclr: regime_acc=0.790 vol_r2=0.099 anom_auroc=0.521 clust_nmi=0.252 fcast_ic=0.051 gpu_h=0.200
+[run_finance] random: regime_acc=0.802 vol_r2=0.169 anom_auroc=0.726 clust_nmi=0.141 fcast_ic=0.116 gpu_h=0.000
+[temporal_jepa] step 0 loss 2.0694 lr 0.00e+00 std 0.228 effrank 5.2 varratio 0.092
+[temporal_jepa] step 50 loss 1.2264 lr 1.39e-04 std 0.600 effrank 6.1 varratio 0.024
+[temporal_jepa] step 100 loss 0.9441 lr 2.78e-04 std 0.771 effrank 13.4 varratio 0.026
+[temporal_jepa] step 150 loss 0.6887 lr 4.17e-04 std 0.929 effrank 29.8 varratio 0.037
+[temporal_jepa] step 200 loss 0.5115 lr 5.00e-04 std 0.973 effrank 42.5 varratio 0.054
+[temporal_jepa] step 250 loss 0.3760 lr 4.98e-04 std 1.002 effrank 54.1 varratio 0.078
+[temporal_jepa] step 300 loss 0.3732 lr 4.93e-04 std 1.010 effrank 64.6 varratio 0.059
+[temporal_jepa] step 350 loss 0.2826 lr 4.87e-04 std 1.014 effrank 72.4 varratio 0.054
+[temporal_jepa] step 400 loss 0.2402 lr 4.78e-04 std 1.020 effrank 80.2 varratio 0.052
+[temporal_jepa] step 450 loss 0.2668 lr 4.67e-04 std 1.027 effrank 86.6 varratio 0.052
+[temporal_jepa] step 500 loss 0.2772 lr 4.53e-04 std 1.032 effrank 92.0 varratio 0.039
+[temporal_jepa] step 550 loss 0.2054 lr 4.38e-04 std 1.022 effrank 94.9 varratio 0.050
+[temporal_jepa] step 600 loss 0.1863 lr 4.22e-04 std 1.026 effrank 98.4 varratio 0.045
+[temporal_jepa] step 650 loss 0.2047 lr 4.03e-04 std 1.033 effrank 101.6 varratio 0.044
+[temporal_jepa] step 700 loss 0.1864 lr 3.84e-04 std 1.034 effrank 103.4 varratio 0.062
+[temporal_jepa] step 750 loss 0.2332 lr 3.62e-04 std 1.037 effrank 105.9 varratio 0.049
+[temporal_jepa] step 800 loss 0.1652 lr 3.40e-04 std 1.037 effrank 108.9 varratio 0.041
+[temporal_jepa] step 850 loss 0.1863 lr 3.17e-04 std 1.040 effrank 108.0 varratio 0.084
+[temporal_jepa] step 900 loss 0.1729 lr 2.94e-04 std 1.039 effrank 110.7 varratio 0.042
+[temporal_jepa] step 950 loss 0.2810 lr 2.70e-04 std 1.039 effrank 111.2 varratio 0.028
+[temporal_jepa] step 1000 loss 0.2197 lr 2.46e-04 std 1.036 effrank 113.0 varratio 0.029
+[temporal_jepa] step 1050 loss 0.1774 lr 2.22e-04 std 1.041 effrank 112.5 varratio 0.035
+[temporal_jepa] step 1100 loss 0.1524 lr 1.98e-04 std 1.036 effrank 114.4 varratio 0.054
+[temporal_jepa] step 1150 loss 0.1311 lr 1.74e-04 std 1.036 effrank 114.6 varratio 0.064
+[temporal_jepa] step 1200 loss 0.1636 lr 1.52e-04 std 1.040 effrank 114.1 varratio 0.055
+[temporal_jepa] step 1250 loss 0.1736 lr 1.30e-04 std 1.038 effrank 114.9 varratio 0.033
+[temporal_jepa] step 1300 loss 0.1742 lr 1.09e-04 std 1.036 effrank 115.9 varratio 0.052
+[temporal_jepa] step 1350 loss 0.1876 lr 9.01e-05 std 1.033 effrank 116.0 varratio 0.033
+[temporal_jepa] step 1400 loss 0.1195 lr 7.24e-05 std 1.035 effrank 116.1 varratio 0.059
+[temporal_jepa] step 1450 loss 0.1440 lr 5.63e-05 std 1.034 effrank 117.2 varratio 0.052
+[temporal_jepa] step 1500 loss 0.1136 lr 4.20e-05 std 1.031 effrank 116.3 varratio 0.120
+[temporal_jepa] step 1550 loss 0.1791 lr 2.98e-05 std 1.036 effrank 117.1 varratio 0.064
+[temporal_jepa] step 1600 loss 0.2012 lr 1.95e-05 std 1.035 effrank 117.6 varratio 0.031
+[temporal_jepa] step 1650 loss 0.2429 lr 1.15e-05 std 1.033 effrank 117.4 varratio 0.031
+[temporal_jepa] step 1700 loss 0.1253 lr 5.68e-06 std 1.036 effrank 117.6 varratio 0.050
+[temporal_jepa] step 1750 loss 0.1619 lr 2.17e-06 std 1.031 effrank 117.6 varratio 0.034
+[run_finance] tjepa_h5: regime_acc=0.516 vol_r2=-0.087 anom_auroc=0.644 clust_nmi=0.185 fcast_ic=0.008 gpu_h=0.104
+[temporal_jepa] step 0 loss 2.0617 lr 0.00e+00 std 0.236 effrank 5.4 varratio 0.084
+[temporal_jepa] step 50 loss 1.2336 lr 1.39e-04 std 0.601 effrank 6.4 varratio 0.021
+[temporal_jepa] step 100 loss 0.9015 lr 2.78e-04 std 0.802 effrank 14.4 varratio 0.020
+[temporal_jepa] step 150 loss 0.6656 lr 4.17e-04 std 0.925 effrank 30.8 varratio 0.038
+[temporal_jepa] step 200 loss 0.6326 lr 5.00e-04 std 0.974 effrank 42.5 varratio 0.037
+[temporal_jepa] step 250 loss 0.4076 lr 4.98e-04 std 1.002 effrank 54.6 varratio 0.061
+[temporal_jepa] step 300 loss 0.3640 lr 4.93e-04 std 1.011 effrank 64.5 varratio 0.065
+[temporal_jepa] step 350 loss 0.2996 lr 4.87e-04 std 1.013 effrank 70.8 varratio 0.069
+[temporal_jepa] step 400 loss 0.3337 lr 4.78e-04 std 1.020 effrank 78.3 varratio 0.059
+[temporal_jepa] step 450 loss 0.2240 lr 4.67e-04 std 1.024 effrank 83.6 varratio 0.074
+[temporal_jepa] step 500 loss 0.2153 lr 4.53e-04 std 1.031 effrank 89.5 varratio 0.043
+[temporal_jepa] step 550 loss 0.2338 lr 4.38e-04 std 1.022 effrank 93.6 varratio 0.043
+[temporal_jepa] step 600 loss 0.2418 lr 4.22e-04 std 1.023 effrank 97.0 varratio 0.043
+[temporal_jepa] step 650 loss 0.2398 lr 4.03e-04 std 1.026 effrank 100.2 varratio 0.047
+[temporal_jepa] step 700 loss 0.2658 lr 3.84e-04 std 1.039 effrank 101.1 varratio 0.043
+[temporal_jepa] step 750 loss 0.2041 lr 3.62e-04 std 1.034 effrank 105.4 varratio 0.059
+[temporal_jepa] step 800 loss 0.2083 lr 3.40e-04 std 1.033 effrank 107.7 varratio 0.052
+[temporal_jepa] step 850 loss 0.2427 lr 3.17e-04 std 1.039 effrank 107.8 varratio 0.056
+[temporal_jepa] step 900 loss 0.2415 lr 2.94e-04 std 1.038 effrank 110.4 varratio 0.043
+[temporal_jepa] step 950 loss 0.2251 lr 2.70e-04 std 1.036 effrank 110.9 varratio 0.041
+[temporal_jepa] step 1000 loss 0.2395 lr 2.46e-04 std 1.039 effrank 111.9 varratio 0.036
+[temporal_jepa] step 1050 loss 0.1706 lr 2.22e-04 std 1.038 effrank 111.6 varratio 0.046
+[temporal_jepa] step 1100 loss 0.1828 lr 1.98e-04 std 1.035 effrank 113.7 varratio 0.045
+[temporal_jepa] step 1150 loss 0.1765 lr 1.74e-04 std 1.035 effrank 114.0 varratio 0.037
+[temporal_jepa] step 1200 loss 0.1556 lr 1.52e-04 std 1.036 effrank 114.1 varratio 0.072
+[temporal_jepa] step 1250 loss 0.1628 lr 1.30e-04 std 1.037 effrank 114.6 varratio 0.047
+[temporal_jepa] step 1300 loss 0.1876 lr 1.09e-04 std 1.036 effrank 115.5 varratio 0.042
+[temporal_jepa] step 1350 loss 0.1346 lr 9.01e-05 std 1.032 effrank 115.5 varratio 0.052
+[temporal_jepa] step 1400 loss 0.1751 lr 7.24e-05 std 1.034 effrank 116.3 varratio 0.057
+[temporal_jepa] step 1450 loss 0.1769 lr 5.63e-05 std 1.034 effrank 116.8 varratio 0.037
+[temporal_jepa] step 1500 loss 0.1971 lr 4.20e-05 std 1.030 effrank 116.0 varratio 0.063
+[temporal_jepa] step 1550 loss 0.2326 lr 2.98e-05 std 1.036 effrank 116.2 varratio 0.060
+[temporal_jepa] step 1600 loss 0.1772 lr 1.95e-05 std 1.033 effrank 117.3 varratio 0.049
+[temporal_jepa] step 1650 loss 0.2337 lr 1.15e-05 std 1.032 effrank 116.7 varratio 0.039
+[temporal_jepa] step 1700 loss 0.2004 lr 5.68e-06 std 1.035 effrank 117.1 varratio 0.033
+[temporal_jepa] step 1750 loss 0.1466 lr 2.17e-06 std 1.032 effrank 116.7 varratio 0.051
+[run_finance] tjepa_h20: regime_acc=0.494 vol_r2=-0.349 anom_auroc=0.650 clust_nmi=0.156 fcast_ic=-0.086 gpu_h=0.104
+[temporal_jepa] step 0 loss 1.2917 lr 0.00e+00 std 0.226 effrank 5.2 varratio 0.089
+[temporal_jepa] step 50 loss 0.6706 lr 1.39e-04 std 0.171 effrank 4.5 varratio 0.011
+[temporal_jepa] step 100 loss 0.4843 lr 2.78e-04 std 0.232 effrank 3.4 varratio 0.023
+[temporal_jepa] step 150 loss 0.4283 lr 4.17e-04 std 0.292 effrank 2.7 varratio 0.045
+[temporal_jepa] step 200 loss 0.4631 lr 5.00e-04 std 0.343 effrank 2.3 varratio 0.051
+[temporal_jepa] step 250 loss 0.4353 lr 4.98e-04 std 0.385 effrank 2.5 varratio 0.074
+[temporal_jepa] step 300 loss 0.4457 lr 4.93e-04 std 0.464 effrank 2.2 varratio 0.101
+[temporal_jepa] step 350 loss 0.5161 lr 4.87e-04 std 0.461 effrank 2.3 varratio 0.144
+[temporal_jepa] step 400 loss 0.4857 lr 4.78e-04 std 0.518 effrank 2.4 varratio 0.138
+[temporal_jepa] step 450 loss 0.5063 lr 4.67e-04 std 0.529 effrank 2.4 varratio 0.175
+[temporal_jepa] step 500 loss 0.5654 lr 4.53e-04 std 0.542 effrank 2.7 varratio 0.158
+[temporal_jepa] step 550 loss 0.5809 lr 4.38e-04 std 0.546 effrank 2.9 varratio 0.138
+[temporal_jepa] step 600 loss 0.5661 lr 4.22e-04 std 0.538 effrank 2.7 varratio 0.165
+[temporal_jepa] step 650 loss 0.5964 lr 4.03e-04 std 0.550 effrank 2.5 varratio 0.226
+[temporal_jepa] step 700 loss 0.5397 lr 3.84e-04 std 0.578 effrank 2.9 varratio 0.257
+[temporal_jepa] step 750 loss 0.6027 lr 3.62e-04 std 0.597 effrank 3.0 varratio 0.283
+[temporal_jepa] step 800 loss 0.6047 lr 3.40e-04 std 0.560 effrank 3.0 varratio 0.238
+[temporal_jepa] step 850 loss 0.6779 lr 3.17e-04 std 0.597 effrank 3.0 varratio 0.274
+[temporal_jepa] step 900 loss 0.6518 lr 2.94e-04 std 0.611 effrank 3.2 varratio 0.257
+[temporal_jepa] step 950 loss 0.6935 lr 2.70e-04 std 0.584 effrank 3.4 varratio 0.209
+[temporal_jepa] step 1000 loss 0.6293 lr 2.46e-04 std 0.593 effrank 3.3 varratio 0.251
+[temporal_jepa] step 1050 loss 0.6608 lr 2.22e-04 std 0.558 effrank 3.6 varratio 0.188
+[temporal_jepa] step 1100 loss 0.6906 lr 1.98e-04 std 0.558 effrank 3.7 varratio 0.226
+[temporal_jepa] step 1150 loss 0.7247 lr 1.74e-04 std 0.576 effrank 4.4 varratio 0.205
+[temporal_jepa] step 1200 loss 0.6749 lr 1.52e-04 std 0.590 effrank 3.8 varratio 0.223
+[temporal_jepa] step 1250 loss 0.6616 lr 1.30e-04 std 0.607 effrank 3.6 varratio 0.266
+[temporal_jepa] step 1300 loss 0.6626 lr 1.09e-04 std 0.615 effrank 4.3 varratio 0.237
+[temporal_jepa] step 1350 loss 0.7434 lr 9.01e-05 std 0.613 effrank 4.2 varratio 0.218
+[temporal_jepa] step 1400 loss 0.6415 lr 7.24e-05 std 0.616 effrank 4.1 varratio 0.260
+[temporal_jepa] step 1450 loss 0.7051 lr 5.63e-05 std 0.594 effrank 4.5 varratio 0.228
+[temporal_jepa] step 1500 loss 0.6555 lr 4.20e-05 std 0.630 effrank 4.2 varratio 0.286
+[temporal_jepa] step 1550 loss 0.6736 lr 2.98e-05 std 0.615 effrank 4.3 varratio 0.255
+[temporal_jepa] step 1600 loss 0.6296 lr 1.95e-05 std 0.611 effrank 4.3 varratio 0.261
+[temporal_jepa] step 1650 loss 0.6853 lr 1.15e-05 std 0.619 effrank 4.5 varratio 0.264
+[temporal_jepa] step 1700 loss 0.6765 lr 5.68e-06 std 0.610 effrank 4.5 varratio 0.244
+[temporal_jepa] step 1750 loss 0.6480 lr 2.17e-06 std 0.604 effrank 4.7 varratio 0.233
+[run_finance] tjepa_noreg: regime_acc=0.746 vol_r2=0.021 anom_auroc=0.693 clust_nmi=0.256 fcast_ic=0.047 gpu_h=0.104
+[run_finance] wrote runs/finance_results.csv
