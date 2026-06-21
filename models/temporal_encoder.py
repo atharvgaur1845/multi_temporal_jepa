@@ -32,9 +32,14 @@ class TemporalEncoder(nn.Module):
     frames are ignored. We fold N into the batch so each spatial location attends across time.
     """
 
-    def __init__(self, embed_dim=256, depth=4, num_heads=8, mlp_ratio=4.0, grad_checkpoint=False):
+    def __init__(self, embed_dim=256, depth=4, num_heads=8, mlp_ratio=4.0, grad_checkpoint=False,
+                 temporal_period=366):
         super().__init__()
         self.embed_dim = embed_dim
+        # Period of the sin/cos temporal encoding. 366 = day-of-year (PASTIS/finance: periodic over a
+        # year). For monotonic time axes (e.g. C-MAPSS operating cycles) set this LARGER than the
+        # longest sequence so phases stay distinct and don't wrap (a cycle index is not periodic).
+        self.temporal_period = temporal_period
         self.blocks = nn.ModuleList(
             [Block(embed_dim, num_heads, mlp_ratio) for _ in range(depth)]
         )
@@ -43,8 +48,8 @@ class TemporalEncoder(nn.Module):
 
     def forward(self, tokens, dates, pad_mask=None):
         B, T, N, D = tokens.shape
-        # DOY temporal positional encoding, added across the time axis (broadcast over N).
-        temp_pos = doy_sincos_pos_embed(dates, D, pad_mask=pad_mask)  # (B, T, D)
+        # temporal positional encoding, added across the time axis (broadcast over N).
+        temp_pos = doy_sincos_pos_embed(dates, D, period=self.temporal_period, pad_mask=pad_mask)
         x = tokens + temp_pos.unsqueeze(2)  # (B, T, N, D)
 
         # fold N into batch so attention is over T: (B, T, N, D) -> (B*N, T, D)

@@ -38,10 +38,15 @@ def _to_device(batch, device):
 
 def _new_backbone(cfg, meta, device):
     enc = cfg["encoder"]
+    # Baselines (esp. BYOL: 2 backbones x 2 views; SimCLR: 2 views) encode every frame of the window
+    # for the global pool, so their activation memory is several x the JEPA path. Force gradient
+    # checkpointing on the baseline backbone to bound it (numerically identical, ~25% slower) — this
+    # lets BYOL/SimCLR fit the same batch as the JEPA cells on an 8 GB card.
     return PanelEncoder(num_assets=meta["num_assets"], num_features=meta["num_features"],
                         embed_dim=enc["embed_dim"], depth=enc["depth"], num_heads=enc["num_heads"],
                         temporal_depth=enc.get("temporal_depth", 4),
-                        grad_checkpoint=enc.get("grad_checkpoint", False)).to(device)
+                        grad_checkpoint=True,
+                        temporal_period=cfg.get("temporal", {}).get("period", 366)).to(device)
 
 
 def _jitter(data, sigma):

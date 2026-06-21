@@ -1,0 +1,51 @@
+# C-MAPSS JEPA config (industrial analogue of fjepa.yaml). Tokens = sensors (N≈15-17), F=3 causal
+# per-sensor features, window=40 cycles. Same anti-collapse stack as satellite/finance.
+objective: temporal_jepa
+device: cuda
+
+encoder:
+  embed_dim: 128
+  depth: 4                 # cross-sensor (per-cycle) ViT depth
+  num_heads: 4
+  temporal_depth: 4        # across-cycle temporal transformer depth
+  grad_checkpoint: false
+
+predictor:
+  embed_dim: 64            # narrower than encoder (128) — asymmetry bottleneck
+  depth: 4
+  num_heads: 4
+
+ema:
+  base_momentum: 0.996
+  final_momentum: 1.0
+  schedule: linear
+
+temporal:
+  horizon: 1               # predict the next cycle's sensor latent (sweep 1/5/20 in the matrix)
+  min_context: 8           # at least 8 past cycles before the target
+  period: 1024             # NON-periodic: > longest engine (FD004 max 543) so cycle phases don't wrap
+
+loss:
+  type: l2
+  target_layernorm: true
+  stop_grad: true
+  var_coeff: 1.0           # VICReg variance hinge (set 0 to recover pure I-JEPA -> collapse)
+  cov_coeff: 0.04
+
+optim:
+  name: adamw
+  lr: 5.0e-4
+  warmup_epochs: 5
+  min_lr: 1.0e-6
+  weight_decay_start: 0.04
+  weight_decay_end: 0.40
+  epochs: 40
+  batch_size: 256
+  grad_accum: 1
+  amp: true
+  augment: true
+  jitter: 0.05             # std of additive feature noise (label-free pretraining aug)
+
+log:
+  diagnostics_every: 100
+  seed: 0

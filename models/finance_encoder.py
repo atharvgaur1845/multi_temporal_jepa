@@ -35,19 +35,21 @@ class PanelEncoder(nn.Module):
     """
 
     def __init__(self, num_assets=9, num_features=4, embed_dim=128, depth=4, num_heads=4,
-                 temporal_depth=4, mlp_ratio=4.0, grad_checkpoint=False):
+                 temporal_depth=4, mlp_ratio=4.0, grad_checkpoint=False, temporal_period=366):
         super().__init__()
         self.num_assets = num_assets
         self.num_patches = num_assets                      # name parity with SITSEncoder
         self.num_features = num_features
         self.embed_dim = embed_dim
         self.frame_embed = nn.Linear(num_features, embed_dim)
-        # learned per-asset positional embedding (assets have identity but no spatial order).
+        # learned per-asset positional embedding (assets/sensors have identity but no spatial order).
         self.spatial_pos = nn.Parameter(torch.zeros(num_assets, embed_dim))
         nn.init.trunc_normal_(self.spatial_pos, std=0.02)
         self.spatial_vit = ViTEncoder(embed_dim, depth, num_heads, mlp_ratio, grad_checkpoint)
+        # temporal_period: 366 for periodic day-of-year (finance); a large value for monotonic
+        # axes like C-MAPSS operating cycles (see TemporalEncoder).
         self.temporal_enc = TemporalEncoder(embed_dim, temporal_depth, num_heads, mlp_ratio,
-                                            grad_checkpoint)
+                                            grad_checkpoint, temporal_period=temporal_period)
 
     # ---- per-frame (single day) paths ----
     def encode_full(self, frame):

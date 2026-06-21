@@ -36,7 +36,8 @@ class FinanceJEPA(nn.Module):
     def __init__(self, objective="temporal_jepa", num_assets=9, num_features=4,
                  embed_dim=128, depth=4, num_heads=4, temporal_depth=4,
                  pred_dim=64, pred_depth=4, pred_heads=4,
-                 horizon=1, min_context=8, n_targets=None, grad_checkpoint=False):
+                 horizon=1, min_context=8, n_targets=None, grad_checkpoint=False,
+                 temporal_period=366):
         super().__init__()
         assert objective in ("spatial_jepa", "temporal_jepa")
         assert pred_dim < embed_dim, (
@@ -46,10 +47,12 @@ class FinanceJEPA(nn.Module):
         self.horizon = horizon
         self.min_context = min_context
         self.num_assets = num_assets
+        self.temporal_period = temporal_period
         self.n_targets = n_targets if n_targets is not None else max(1, num_assets // 2)
 
         self.context_encoder = PanelEncoder(num_assets, num_features, embed_dim, depth, num_heads,
-                                            temporal_depth, grad_checkpoint=grad_checkpoint)
+                                            temporal_depth, grad_checkpoint=grad_checkpoint,
+                                            temporal_period=temporal_period)
         self.target_encoder = copy.deepcopy(self.context_encoder)
         for p in self.target_encoder.parameters():
             p.requires_grad_(False)
@@ -113,7 +116,8 @@ class FinanceJEPA(nn.Module):
         tgt_frame = data[bidx, tgt_idx]                              # (B, N, F)
         tgt_date = dates[bidx, tgt_idx]                              # (B,)
         spat = self.context_encoder.spatial_pos.unsqueeze(0)        # (1, N, D)
-        doy = doy_sincos_pos_embed(tgt_date.unsqueeze(1), self.embed_dim).squeeze(1)  # (B, D)
+        doy = doy_sincos_pos_embed(tgt_date.unsqueeze(1), self.embed_dim,
+                                   period=self.temporal_period).squeeze(1)  # (B, D)
         target_pos = spat + doy.unsqueeze(1)                         # (B, N, D)
         pred = self.predictor(ctx_repr, target_pos)                 # (B, N, D)
         with torch.no_grad():
@@ -147,4 +151,5 @@ def build_finance_model(cfg, meta):
         pred_dim=pdim, pred_depth=pred["depth"], pred_heads=pheads,
         horizon=temp.get("horizon", 1), min_context=temp.get("min_context", 8),
         grad_checkpoint=enc.get("grad_checkpoint", False),
+        temporal_period=temp.get("period", 366),
     )

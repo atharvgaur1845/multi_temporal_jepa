@@ -296,7 +296,44 @@ synthetic fallback) · `models/finance_encoder.py` + `models/finance_jepa.py` ·
 
 ---
 
-## 8. Reference
+## 8. Phase 3 — Industrial degradation (NASA C-MAPSS)
+
+The third modality, chosen to sit at the **predictable** end of the temporal-structure spectrum:
+turbofan wear is a smooth monotonic trajectory (healthy → wear → failure) — what latent
+future-prediction should model best. It completes a three-point thesis (PASTIS periodic → win;
+finance stochastic → loss; **C-MAPSS monotonic → expected win**). Full write-up:
+**[report_cmapss.md](report_cmapss.md)**.
+
+Mapping: **21 sensors = cross-section (tokens)**, **operating cycle = frame**, window = 40 cycles —
+so the *same* `PanelEncoder`/`FinanceJEPA`/trainers from §7 are reused. The **one** adaptation is the
+temporal positional encoding: cycles are monotonic, not periodic, so a `temporal_period` knob
+(default 366 = day-of-year, behaviour-preserving for satellite + finance) is set to 1024 for C-MAPSS
+so cycle phases don't wrap (`models/temporal_encoder.py`, threaded through `build_finance_model`).
+
+**Five representation-quality tasks** (frozen encoder; `eval/cmapss_tasks.py`): RUL regression
+(R²/RMSE/rank-IC **+ the standard NASA last-cycle RMSE & PHM08 score**), health-stage classification
+(acc/F1), anomaly detection (AUROC/AP), clustering (NMI/ARI), nearest-neighbour retrieval
+(health-p@k, RUL-IC). Per the finance lesson, the controls are the real bar: **`random`** (untrained)
+and **`raw_features`** (probes on pooled raw sensors, no encoder).
+
+```bash
+python scripts/download_cmapss.py                        # NASA mirror, or --zip CMAPSSData.zip (+ synthetic fallback)
+python scripts/run_cmapss_matrix.py --config configs/model/cjepa.yaml \
+       --data configs/data/cmapss.yaml --device cuda:0    # all FD001-FD004, all cells -> runs/cmapss_results.csv
+python scripts/aggregate_cmapss.py                        # per-FD comparison tables + per-task verdict
+python scripts/cmapss_smoketest.py --device cuda:0        # M1 gate
+pytest tests/test_cmapss_*.py -q                          # 12 tests, fully offline (synthetic fallback)
+```
+
+C-MAPSS modules: `data/cmapss_dataset.py` (FD parsing, condition-normalization, RUL/health/anomaly
+labels, per-engine windows, standard-protocol set, synthetic fallback) · `eval/cmapss_tasks.py` ·
+`scripts/{download_cmapss,run_cmapss_matrix,aggregate_cmapss,cmapss_smoketest}.py` ·
+`configs/model/cjepa.yaml`, `configs/data/cmapss.yaml`. Reuses `models/finance_encoder.py` +
+`models/finance_jepa.py` + `engine/train_finance.py` + `masking/asset_mask.py` unchanged.
+
+---
+
+## 9. Reference
 
 I-JEPA (Assran 2023, 2301.08243) · V-JEPA (Bardes 2024, 2404.08471) · PASTIS/U-TAE (ICCV 2021,
 2107.07933; Zenodo 10.5281/zenodo.5012942) · MAE (2111.06377) · BYOL (2006.07733) ·

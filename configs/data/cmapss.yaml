@@ -1,0 +1,11 @@
+# NASA C-MAPSS turbofan degradation (download via scripts/download_cmapss.py -> data_root/CMAPSS/;
+# falls back to a synthetic monotonic-degradation panel if the files are absent).
+root: data_root/CMAPSS
+fds: [FD001, FD002, FD003, FD004]   # subsets the matrix loops over (--fds overrides)
+window: 40                          # cycles per sample (comfortably fits horizon up to 20)
+train_stride: 2                     # stride-2 pretrain windows (adjacent cycles are redundant; ~2x faster)
+eval_stride: 3                      # decorrelate probe windows
+rul_cap: 125                        # piecewise-linear RUL cap (standard C-MAPSS convention)
+anom_rul: 20                        # RUL <= this => near-failure anomaly label
+health_thr: [100, 50, 20]           # RUL thresholds for 4 health stages (healthy/early/late/critical)
+allow_synth: true                   # synthetic fallback if the data files are missing
