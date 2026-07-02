@@ -10,7 +10,11 @@ masked-region prediction) and reconstruction/contrastive baselines (MAE, BYOL, S
 > remote sensing than *spatial* JEPA, under equal epochs?
 
 **For the full write-up** (hypothesis, method, what differs from I-JEPA, protocol, results,
-caveats) see **[report.md](report.md)**. This README is the engineering reference.
+caveats) see **[report.md](report.md)**. This README is the engineering reference. The three phases
+have their own reports — **[report.md](report.md)** (satellite), **[report_finance.md](report_finance.md)**
+(finance), **[report_cmapss.md](report_cmapss.md)** (industrial) — and a single cross-domain research
+monograph (math foundations → architecture → all experiments → theory) is in
+**[report_full.md](report_full.md)**.
 
 ## Headline result (PASTIS held-out TEST fold, P8 / embed-512 / 100 epochs)
 
