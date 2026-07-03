@@ -48,6 +48,44 @@ def jepa_latent_loss(pred, target, norm_target=True, loss_type="l2"):
     return per_elem.mean()
 
 
+def jepa_beta_nll_loss(mu, logvar, target, beta=0.5, norm_target=True, eps=1e-6):
+    """Heteroscedastic beta-NLL latent loss (Phase 4 — the distributional JEPA objective).
+
+    The predictor emits a Gaussian N(mu, sigma^2=exp(logvar)) over the future latent instead of a
+    point. Motivation (report_finance.md §12): when the future is unpredictable (markets), a POINT L2
+    target is noise and the objective erases usable structure. With a variance head the model can
+    output large sigma^2 where the future is unpredictable, which DOWN-WEIGHTS the un-learnable mean
+    gradient (sigma^2 divides the squared error), so capacity flows to what IS predictable — the
+    variance itself (volatility clusters). sigma^2 thus becomes a learned volatility signal.
+
+    Standard Gaussian NLL per element (target detached + LayerNorm'd, as in the point loss):
+        NLL_i = 0.5 * [ (y_i - mu_i)^2 / sigma_i^2 + log sigma_i^2 ]
+
+    beta-NLL (Seitzer et al., ICLR 2022, "On the Pitfalls of Heteroscedastic Uncertainty Estimation")
+    fixes the known gradient pathology (sigma^2 couples into the mean gradient, hurting the mean fit)
+    by weighting each element's loss by a STOP-GRADIENT variance term:
+        L = mean_i [ sg(sigma_i^2)^beta * NLL_i ]
+    so d L / d mu_i  ∝  (mu_i - y_i) / sigma_i^(2 - 2*beta).  beta=0 -> pure NLL; beta=1 -> the mean
+    gradient ignores the variance (robust mean, variance still learned via the log term); beta=0.5
+    (default, recommended) balances the two. Reference impl: martius-lab/beta-nll.
+
+    Args
+        mu, logvar : (..., D)  predictor mean and log-variance (gradient flows through both)
+        target     : (..., D)  target-encoder output (detached here -> stop-grad)
+        beta       : beta-NLL exponent in [0, 1]
+        norm_target: LayerNorm the target over the feature dim (matches jepa_latent_loss)
+    Returns: scalar loss.
+    """
+    target = target.detach()
+    if norm_target:
+        target = F.layer_norm(target, (target.shape[-1],))
+    var = logvar.exp().clamp_min(eps)
+    nll = 0.5 * ((target - mu) ** 2 / var + logvar)             # (..., D)
+    if beta > 0:
+        nll = nll * var.detach() ** beta                        # stop-grad variance weighting
+    return nll.mean()
+
+
 def variance_covariance_reg(z, gamma=1.0, eps=1e-4):
     """VICReg-style anti-collapse regularizer on a trainable embedding `z` (..., D).
 

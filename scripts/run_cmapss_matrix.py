@@ -27,6 +27,10 @@ from utils.config import load_yaml  # noqa: E402
 def enumerate_cells():
     cells = [
         ("tjepa_h1", {"objective": "temporal_jepa", "temporal": {"horizon": 1}}),
+        # Phase 4: distributional temporal JEPA — guardrail (must NOT regress the industrial win).
+        ("tjepa_dist", {"objective": "temporal_jepa", "temporal": {"horizon": 1},
+                        "predictor": {"distributional": True},
+                        "loss": {"type": "beta_nll", "beta": 0.5}}),
         ("spatial_jepa", {"objective": "spatial_jepa"}),
         ("mae", {"objective": "mae"}),
         ("byol", {"objective": "byol"}),

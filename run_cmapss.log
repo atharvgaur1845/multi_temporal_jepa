@@ -507,3 +507,24 @@ torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 76.00 MiB. GPU 0 h
 [temporal_jepa] step 600 loss 0.1490 lr 9.50e-06 std 0.608 effrank 3.8 varratio 0.626
 [run_cmapss] FD001/tjepa_noreg: rul_r2=0.703 rmse=16.55 phm08=438 health_acc=0.789 anom=0.990 clust_nmi=0.149 retr=0.636 gpu_h=0.067
 [run_cmapss] wrote runs/cmapss_results.csv
+[run_cmapss] fds=['FD001'] 11 cells; running 2; skipping 9
+[run_cmapss] SKIPPED (budget): spatial_jepa
+[run_cmapss] SKIPPED (budget): mae
+[run_cmapss] SKIPPED (budget): byol
+[run_cmapss] SKIPPED (budget): simclr
+[run_cmapss] SKIPPED (budget): random
+[run_cmapss] SKIPPED (budget): raw_features
+[run_cmapss] SKIPPED (budget): tjepa_h5
+[run_cmapss] SKIPPED (budget): tjepa_h20
+[run_cmapss] SKIPPED (budget): tjepa_noreg
+[run_cmapss] FD001: source=nasa sensors=15 feats=3 train_eng=100 test_eng=100 pretrain_win=8390 std_protocol_eng=96 (engines >= window kept)
+[run_cmapss] FD001/tjepa_h1: already complete -> skip
+[temporal_jepa] step 0 loss 1.4402 lr 0.00e+00 std 0.293 effrank 2.5 varratio 0.009 sigma 1.000 var_volcorr 0.000
+[temporal_jepa] step 100 loss 0.3909 lr 3.13e-04 std 0.868 effrank 18.0 varratio 0.036 sigma 0.780 var_volcorr 0.475
+[temporal_jepa] step 200 loss 0.1505 lr 4.91e-04 std 0.985 effrank 43.0 varratio 0.167 sigma 0.614 var_volcorr 0.496
+[temporal_jepa] step 300 loss -0.0211 lr 4.02e-04 std 1.007 effrank 61.0 varratio 0.399 sigma 0.521 var_volcorr 0.438
+[temporal_jepa] step 400 loss -0.0773 lr 2.51e-04 std 1.012 effrank 72.8 varratio 0.500 sigma 0.450 var_volcorr 0.548
+[temporal_jepa] step 500 loss -0.1071 lr 9.86e-05 std 1.015 effrank 79.5 varratio 0.496 sigma 0.409 var_volcorr 0.391
+[temporal_jepa] step 600 loss -0.1320 lr 9.50e-06 std 1.016 effrank 82.0 varratio 0.527 sigma 0.402 var_volcorr 0.436
+[run_cmapss] FD001/tjepa_dist: rul_r2=0.658 rmse=17.76 phm08=578 health_acc=0.733 anom=0.990 clust_nmi=0.107 retr=0.660 gpu_h=0.093
+[run_cmapss] wrote runs/cmapss_results.csv

@@ -21,7 +21,7 @@ from models.finance_encoder import PanelEncoder
 from models.finance_jepa import build_finance_model
 from objectives.baselines.byol import byol_loss, mlp_head
 from objectives.baselines.simclr import nt_xent_loss, projector
-from objectives.jepa_loss import jepa_latent_loss, variance_covariance_reg
+from objectives.jepa_loss import jepa_beta_nll_loss, jepa_latent_loss, variance_covariance_reg
 
 
 def _to_device(batch, device):
@@ -47,6 +47,20 @@ def _new_backbone(cfg, meta, device):
                         temporal_depth=enc.get("temporal_depth", 4),
                         grad_checkpoint=True,
                         temporal_period=cfg.get("temporal", {}).get("period", 366)).to(device)
+
+
+def _variance_vol_corr(logvar, data):
+    """Pearson corr between the predictor's per-sample predicted volatility (pooled sigma) and a
+    realized-volatility proxy from the input (within-window temporal std of the primary feature).
+    The mechanism claim of Phase 4: on finance the variance head learns to track realized vol."""
+    with torch.no_grad():
+        pred_vol = logvar.float().exp().sqrt().mean(dim=tuple(range(1, logvar.dim())))  # (B,)
+        proxy = data.float()[..., 0].std(dim=1).mean(dim=1)                             # (B,) realized-vol-like
+        if pred_vol.numel() < 2:
+            return float("nan")
+        pv, px = pred_vol - pred_vol.mean(), proxy - proxy.mean()
+        denom = pv.norm() * px.norm()
+        return float((pv @ px / denom).item()) if denom > 0 else 0.0
 
 
 def _jitter(data, sigma):
@@ -84,8 +98,9 @@ def _opt(params, cfg):
 
 
 # ------------------------------------------------------------------ JEPA (temporal / spatial)
-def train_finance_jepa(loader, cfg, meta, device, logger=print):
-    """Pretrain Temporal or Spatial FinanceJEPA. Returns (target_encoder, use_temporal=True)."""
+def train_finance_jepa(loader, cfg, meta, device, logger=print, return_model=False):
+    """Pretrain Temporal or Spatial FinanceJEPA. Returns (target_encoder, use_temporal=True), or the
+    full model when return_model=True (needed to read the predictor's variance head at eval)."""
     model = build_finance_model(cfg, meta).to(device)
     params = [p for p in model.parameters() if p.requires_grad]
     opt = torch.optim.AdamW(params, lr=cfg["optim"]["lr"],
@@ -100,6 +115,8 @@ def train_finance_jepa(loader, cfg, meta, device, logger=print):
     wd0, wd1 = optim_cfg.get("weight_decay_start", 0.04), optim_cfg.get("weight_decay_end", 0.04)
     sigma = optim_cfg.get("jitter", 0.05)
     var_c, cov_c = loss_cfg.get("var_coeff", 1.0), loss_cfg.get("cov_coeff", 0.04)
+    distributional = getattr(model, "distributional", False)
+    beta = loss_cfg.get("beta", 0.5)
 
     step = 0
     opt.zero_grad(set_to_none=True)
@@ -113,11 +130,18 @@ def train_finance_jepa(loader, cfg, meta, device, logger=print):
             wd = _wd_at(step, total_steps, wd0, wd1)
             for g in opt.param_groups:
                 g["lr"], g["weight_decay"] = lr, wd
+            logvar = None
             with torch.autocast(device_type=device.type, enabled=optim_cfg.get("amp", True)):
-                pred, target, ctx = model(batch)
-                loss = jepa_latent_loss(pred, target,
-                                        norm_target=loss_cfg.get("target_layernorm", True),
-                                        loss_type=loss_cfg.get("type", "l2"))
+                if distributional:                                    # heteroscedastic beta-NLL (Phase 4)
+                    mu, logvar, target, ctx = model(batch)
+                    pred = mu
+                    loss = jepa_beta_nll_loss(mu, logvar, target, beta=beta,
+                                              norm_target=loss_cfg.get("target_layernorm", True))
+                else:
+                    pred, target, ctx = model(batch)
+                    loss = jepa_latent_loss(pred, target,
+                                            norm_target=loss_cfg.get("target_layernorm", True),
+                                            loss_type=loss_cfg.get("type", "l2"))
                 if var_c or cov_c:
                     std_l, cov_l = variance_covariance_reg(ctx.float())
                     loss = loss + var_c * std_l + cov_c * cov_l
@@ -129,10 +153,16 @@ def train_finance_jepa(loader, cfg, meta, device, logger=print):
                 ema_update(model.context_encoder, model.target_encoder, m)
             if step % log_cfg.get("diagnostics_every", 50) == 0:
                 diag = collapse_metrics(ctx, pred=pred, target=target)
+                extra = ""
+                if distributional:                                    # variance-as-volatility diagnostic
+                    extra = f" sigma {logvar.exp().sqrt().mean().item():.3f} " \
+                            f"var_volcorr {_variance_vol_corr(logvar, batch['data']):.3f}"
                 logger(f"[{cfg['objective']}] step {step} loss {loss.item():.4f} lr {lr:.2e} "
                        f"std {diag['per_dim_std']:.3f} effrank {diag['effective_rank']:.1f} "
-                       f"varratio {diag.get('variance_ratio', float('nan')):.3f}")
+                       f"varratio {diag.get('variance_ratio', float('nan')):.3f}{extra}")
             step += 1
+    if return_model:
+        return model, True
     return model.target_encoder, True
 
 

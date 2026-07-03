@@ -376,3 +376,52 @@
 [temporal_jepa] step 1750 loss 0.6480 lr 2.17e-06 std 0.604 effrank 4.7 varratio 0.233
 [run_finance] tjepa_noreg: regime_acc=0.746 vol_r2=0.021 anom_auroc=0.693 clust_nmi=0.256 fcast_ic=0.047 gpu_h=0.104
 [run_finance] wrote runs/finance_results.csv
+[run_finance] 10 cells; running 10; skipping 0
+[run_finance] device=cuda:0 seed=0 source=yahoo assets=9 feats=4 train_windows=4698 test_windows=2044
+[run_finance] tjepa_h1: already complete -> skip
+[temporal_jepa] step 0 loss 1.4186 lr 0.00e+00 std 0.235 effrank 4.9 varratio 0.102 sigma 1.000 var_volcorr 0.000
+[temporal_jepa] step 50 loss 0.8314 lr 1.39e-04 std 0.617 effrank 6.6 varratio 0.025 sigma 0.966 var_volcorr 0.522
+[temporal_jepa] step 100 loss 0.4968 lr 2.78e-04 std 0.833 effrank 15.9 varratio 0.023 sigma 0.802 var_volcorr 0.771
+[temporal_jepa] step 150 loss 0.2213 lr 4.17e-04 std 0.948 effrank 31.2 varratio 0.067 sigma 0.676 var_volcorr 0.814
+[temporal_jepa] step 200 loss 0.1540 lr 5.00e-04 std 0.976 effrank 41.3 varratio 0.086 sigma 0.632 var_volcorr 0.823
+[temporal_jepa] step 250 loss 0.0726 lr 4.98e-04 std 0.985 effrank 51.3 varratio 0.067 sigma 0.573 var_volcorr 0.750
+[temporal_jepa] step 300 loss 0.0448 lr 4.93e-04 std 1.002 effrank 61.3 varratio 0.049 sigma 0.489 var_volcorr 0.800
+[temporal_jepa] step 350 loss -0.0370 lr 4.87e-04 std 1.015 effrank 69.1 varratio 0.054 sigma 0.481 var_volcorr 0.721
+[temporal_jepa] step 400 loss -0.0908 lr 4.78e-04 std 1.018 effrank 75.1 varratio 0.092 sigma 0.496 var_volcorr 0.785
+[temporal_jepa] step 450 loss -0.0484 lr 4.67e-04 std 1.022 effrank 80.4 varratio 0.044 sigma 0.424 var_volcorr 0.762
+[temporal_jepa] step 500 loss 0.0001 lr 4.53e-04 std 1.028 effrank 81.9 varratio 0.048 sigma 0.449 var_volcorr 0.694
+[temporal_jepa] step 550 loss -0.0631 lr 4.38e-04 std 1.014 effrank 87.2 varratio 0.062 sigma 0.435 var_volcorr 0.821
+[temporal_jepa] step 600 loss -0.1401 lr 4.22e-04 std 1.023 effrank 90.0 varratio 0.051 sigma 0.424 var_volcorr 0.760
+[temporal_jepa] step 650 loss -0.1204 lr 4.03e-04 std 1.024 effrank 91.0 varratio 0.064 sigma 0.435 var_volcorr 0.768
+[temporal_jepa] step 700 loss -0.1180 lr 3.84e-04 std 1.035 effrank 94.0 varratio 0.068 sigma 0.406 var_volcorr 0.764
+[temporal_jepa] step 750 loss -0.1160 lr 3.62e-04 std 1.013 effrank 88.8 varratio 0.090 sigma 0.435 var_volcorr 0.758
+[temporal_jepa] step 800 loss -0.0652 lr 3.40e-04 std 1.021 effrank 96.1 varratio 0.049 sigma 0.420 var_volcorr 0.595
+[temporal_jepa] step 850 loss -0.1365 lr 3.17e-04 std 1.038 effrank 96.8 varratio 0.067 sigma 0.393 var_volcorr 0.611
+[temporal_jepa] step 900 loss -0.1142 lr 2.94e-04 std 1.032 effrank 96.1 varratio 0.075 sigma 0.381 var_volcorr 0.754
+[temporal_jepa] step 950 loss -0.0215 lr 2.70e-04 std 1.029 effrank 96.8 varratio 0.038 sigma 0.401 var_volcorr 0.561
+[temporal_jepa] step 1000 loss -0.1665 lr 2.46e-04 std 1.038 effrank 99.9 varratio 0.071 sigma 0.417 var_volcorr 0.650
+[temporal_jepa] step 1050 loss -0.1530 lr 2.22e-04 std 1.034 effrank 97.6 varratio 0.096 sigma 0.404 var_volcorr 0.627
+[temporal_jepa] step 1100 loss -0.1146 lr 1.98e-04 std 1.032 effrank 102.0 varratio 0.078 sigma 0.393 var_volcorr 0.595
+[temporal_jepa] step 1150 loss -0.1327 lr 1.74e-04 std 1.028 effrank 102.7 varratio 0.058 sigma 0.375 var_volcorr 0.658
+[temporal_jepa] step 1200 loss -0.1674 lr 1.52e-04 std 1.032 effrank 103.2 varratio 0.098 sigma 0.406 var_volcorr 0.531
+[temporal_jepa] step 1250 loss -0.1352 lr 1.30e-04 std 1.028 effrank 105.2 varratio 0.072 sigma 0.392 var_volcorr 0.586
+[temporal_jepa] step 1300 loss -0.1555 lr 1.09e-04 std 1.020 effrank 103.7 varratio 0.080 sigma 0.382 var_volcorr 0.535
+[temporal_jepa] step 1350 loss -0.1668 lr 9.01e-05 std 1.026 effrank 104.2 varratio 0.106 sigma 0.409 var_volcorr 0.607
+[temporal_jepa] step 1400 loss -0.1273 lr 7.24e-05 std 1.030 effrank 105.5 varratio 0.066 sigma 0.382 var_volcorr 0.340
+[temporal_jepa] step 1450 loss -0.1701 lr 5.63e-05 std 1.027 effrank 106.5 varratio 0.104 sigma 0.391 var_volcorr 0.587
+[temporal_jepa] step 1500 loss -0.1446 lr 4.20e-05 std 1.029 effrank 107.3 varratio 0.102 sigma 0.389 var_volcorr 0.396
+[temporal_jepa] step 1550 loss -0.0916 lr 2.98e-05 std 1.036 effrank 107.0 varratio 0.068 sigma 0.373 var_volcorr 0.676
+[temporal_jepa] step 1600 loss -0.1100 lr 1.95e-05 std 1.030 effrank 107.9 varratio 0.078 sigma 0.383 var_volcorr 0.613
+[temporal_jepa] step 1650 loss -0.1707 lr 1.15e-05 std 1.026 effrank 108.2 varratio 0.113 sigma 0.378 var_volcorr 0.565
+[temporal_jepa] step 1700 loss -0.1533 lr 5.68e-06 std 1.025 effrank 107.6 varratio 0.113 sigma 0.411 var_volcorr 0.508
+[temporal_jepa] step 1750 loss -0.1447 lr 2.17e-06 std 1.029 effrank 108.1 varratio 0.126 sigma 0.390 var_volcorr 0.459
+[run_finance] tjepa_dist: regime_acc=0.533 vol_r2=-0.227 anom_auroc=0.715 clust_nmi=0.171 fcast_ic=0.022 gpu_h=0.105
+[run_finance] spatial_jepa: already complete -> skip
+[run_finance] mae: already complete -> skip
+[run_finance] byol: already complete -> skip
+[run_finance] simclr: already complete -> skip
+[run_finance] random: already complete -> skip
+[run_finance] tjepa_h5: already complete -> skip
+[run_finance] tjepa_h20: already complete -> skip
+[run_finance] tjepa_noreg: already complete -> skip
+[run_finance] wrote runs/finance_results.csv

@@ -29,6 +29,10 @@ def enumerate_cells():
     cells = []
     # 1) MAIN COMPARISON (the contribution)
     cells.append(("tjepa_h1", {"objective": "temporal_jepa", "temporal": {"horizon": 1}}))
+    # Phase 4: distributional (heteroscedastic beta-NLL) temporal JEPA — the finance-rescue candidate.
+    cells.append(("tjepa_dist", {"objective": "temporal_jepa", "temporal": {"horizon": 1},
+                                 "predictor": {"distributional": True},
+                                 "loss": {"type": "beta_nll", "beta": 0.5}}))
     for obj in ("spatial_jepa", "mae", "byol", "simclr"):
         cells.append((obj, {"objective": obj}))
     cells.append(("random", {"objective": "temporal_jepa", "_random_init": True}))  # control

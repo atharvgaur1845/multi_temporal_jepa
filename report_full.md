@@ -1188,11 +1188,43 @@ single dominant signal (monotone wear) survives any projection, the architecture
 most of the story; SSL's value is real only as difficulty rises.
 
 **Not hidden — designed for.** Both failures are caught *because* of the random-init and raw-feature
-floors; a study reporting only SSL-vs-SSL would have missed them. **Mitigations / future work:**
-(i) for non-stationary finance, condition the predictor on a regime variable, use shorter
-train→test gaps with rolling refits, or predict *distributional* targets (vol) rather than point
-latents; (ii) add a stationarity test as a *go/no-go* before applying temporal JEPA to a new domain
-(§18 gives the falsifiable criterion).
+floors; a study reporting only SSL-vs-SSL would have missed them.
+
+**Phase 4 — the distributional rescue was tried and REJECTED (a controlled negative).** The most
+obvious algorithmic fix for the finance failure is to predict a *distribution* over the future latent
+instead of a point, so the model can output high variance where the future is unpredictable
+(heteroscedastic β-NLL; Seitzer et al., ICLR 2022) and let the predicted variance become a volatility
+signal (returns are unpredictable, but volatility clusters). We implemented this as an additive,
+flag-gated `tjepa_dist` (predictor μ,σ² heads; β=0.5; VICReg retained; 52 tests still pass). The
+*mechanism works* — during training the pooled predicted σ tracks realized volatility at rank-IC
+≈ 0.75–0.82. But the **rescue fails on every downstream criterion**: at matched 50-epoch training the
+distributional representation scores finance regime **0.53** / vol-R² **−0.23** (below point-JEPA's
+0.61 and far below the ~0.80 raw/random floors); exposing the predicted variance as a probe feature
+adds only a small anomaly bump and clears no floor; and on the *predictable* C-MAPSS FD001 it is a
+mild net negative (RUL-R² 0.658 vs point 0.677). So predicting a distribution does not manufacture
+predictable structure that isn't there — the finance failure **survives the obvious fix**, confirming
+it is fundamental (non-stationarity + near-martingale returns), not a point-target artifact. *Novelty
+note:* probabilistic JEPA is itself 2026 prior art (VJEPA, arXiv 2601.14354; Var-JEPA, arXiv
+2603.20111, incl. tabular Var-T-JEPA), so this is a controlled mechanistic test, not a new method.
+Details: [report_finance.md](report_finance.md) §8.
+
+**Phase 5 — is it the shift or unpredictability? UNPREDICTABILITY (an evaluation-protocol fix also
+fails).** One alternative remained: maybe SSL is fine and only the 1999–2017→2018–2026 *distribution
+shift* hurts. We tested it by reusing the encoders with an *in-period* probe (fit+test both inside
+2018–2026) and, definitively, by *re-pretraining the encoder on recent data (≤2019) and evaluating
+fully in-period on 2020–2026 — no shift anywhere*. **With the shift entirely removed, raw features
+still win** (regime 0.831) over every SSL method (MAE 0.685, temporal JEPA 0.460, still worst). So the
+failure is **not** non-stationarity of the split — it is intrinsic task-hardness/unpredictability: the
+regime/vol signal already lives in the engineered features, so a learned representation adds nothing
+and temporal prediction subtracts. The finance negative is thus robust to *both* an algorithmic fix
+(Phase 4) and a protocol fix (Phase 5) — the strongest form of the predictability-spectrum result
+([report_finance.md](report_finance.md) §9).
+
+**Remaining mitigations / future work:** (i) condition the predictor on a regime variable, or use
+rolling train→test refits with shorter gaps (attack the *non-stationarity* directly, which the
+distributional objective did not); (ii) predict genuinely-predictable *scalar* targets (realized vol,
+via a supervised auxiliary) rather than the full future latent; (iii) the §18 stationarity go/no-go as
+a gate before applying temporal JEPA at all.
 
 ---
 
