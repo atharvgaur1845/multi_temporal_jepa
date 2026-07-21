@@ -72,6 +72,27 @@ def test_graph_rejects_spatial_jepa():
              spatial_backbone="graph")
 
 
+@pytest.mark.parametrize("backbone,cls", [("graph", GraphSITSEncoder), ("vit", SITSEncoder)])
+def test_encoder_ckpt_roundtrip_honours_saved_backbone(backbone, cls):
+    """scripts/evaluate.py --encoder-ckpt must rebuild the backbone the cell was TRAINED with.
+
+    Regression: it hardcoded SITSEncoder, so a tjepa_graph checkpoint (spatial_gnn.* keys) failed
+    to load with a missing/unexpected-key RuntimeError. The saved cfg is the source of truth.
+    """
+    ec = {"patch_size": 16, "embed_dim": 32, "depth": 2, "num_heads": 4, "temporal_depth": 2}
+    if backbone != "vit":
+        ec["spatial_backbone"] = backbone
+    trained = cls(patch_size=ec["patch_size"], embed_dim=ec["embed_dim"], depth=ec["depth"],
+                  num_heads=ec["num_heads"], temporal_depth=ec["temporal_depth"])
+
+    # the dispatch evaluate.py performs, driven only by the checkpoint's saved cfg
+    resolved = {"vit": SITSEncoder, "graph": GraphSITSEncoder}[ec.get("spatial_backbone", "vit")]
+    assert resolved is cls
+    rebuilt = resolved(patch_size=ec["patch_size"], embed_dim=ec["embed_dim"], depth=ec["depth"],
+                       num_heads=ec["num_heads"], temporal_depth=ec["temporal_depth"])
+    rebuilt.load_state_dict(trained.state_dict())        # strict=True: keys must match exactly
+
+
 def test_build_model_graph_vs_vit():
     base = {"objective": "temporal_jepa",
             "encoder": {"patch_size": 16, "embed_dim": 32, "depth": 2, "num_heads": 4,

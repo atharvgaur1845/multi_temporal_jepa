@@ -59,13 +59,23 @@ def main():
     msl = data_cfg.get("max_seq_len")
 
     if args.encoder_ckpt:
-        # per-cell encoder from run_matrix: rebuild a bare SITSEncoder from its saved cfg.
+        # per-cell encoder from run_matrix: rebuild a bare encoder from its SAVED cfg (not --config,
+        # which may describe a different cell). The spatial backbone must match what was trained:
+        # a graph cell (Part 6 #8) saves spatial_gnn.* keys and needs GraphSITSEncoder, not the ViT.
         from models.jepa import SITSEncoder
         blob = torch.load(args.encoder_ckpt, map_location=device, weights_only=False)
         ec = blob["cfg"]["encoder"]
-        encoder = SITSEncoder(patch_size=ec["patch_size"], embed_dim=ec["embed_dim"],
-                              depth=ec["depth"], num_heads=ec["num_heads"],
-                              temporal_depth=ec.get("temporal_depth", 4)).to(device)
+        backbone = ec.get("spatial_backbone", "vit")
+        if backbone == "graph":
+            from models.graph_encoder import GraphSITSEncoder as EncoderCls
+        elif backbone == "vit":
+            EncoderCls = SITSEncoder
+        else:
+            raise ValueError(f"[evaluate] unknown encoder.spatial_backbone={backbone!r} in "
+                             f"{args.encoder_ckpt} (expected 'vit' or 'graph')")
+        encoder = EncoderCls(patch_size=ec["patch_size"], embed_dim=ec["embed_dim"],
+                             depth=ec["depth"], num_heads=ec["num_heads"],
+                             temporal_depth=ec.get("temporal_depth", 4)).to(device)
         encoder.load_state_dict(blob["encoder"])
         obj = blob.get("objective", "?")
         use_temporal = blob.get("use_temporal", True)
