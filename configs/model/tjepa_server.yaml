@@ -47,8 +47,8 @@ optim:
   weight_decay_start: 0.04
   weight_decay_end: 0.40
   epochs: 100
-  batch_size: 48                  # ~20 GB (safe); run fit_batch.py to push toward your free memory
-  grad_accum: 4                   # effective batch = 48*4 = 192 (matches existing results)
+  batch_size: 24                 # ~20 GB (safe); run fit_batch.py to push toward your free memory
+  grad_accum: 8                  # effective batch = 48*4 = 192 (matches existing results)
   amp: true
   augment: true
 
