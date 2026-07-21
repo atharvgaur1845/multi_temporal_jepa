@@ -1,0 +1,15 @@
+=== A) PREDICTOR SWAP — downstream latent-recovery R² (higher better) ===
+regime          Ω |  freeform  koopman    ode |  ρ(K)learned
+periodic     0.75 |     0.593    0.632  0.633 |        1.173
+ar1:0.9      0.26 |     0.479    0.515  0.518 |        1.157
+ar1:0.5      0.09 |     0.522    0.536  0.539 |        1.153
+lorenz       0.34 |     0.693    0.690  0.690 |        1.162
+white        0.05 |     0.574    0.577  0.583 |        1.161
+
+=== B) LKF — RMSE vs clean latent (lower better); filter gain should grow with predictability ===
+regime          Ω     MI A_fit_r2  ρ(A) |  measure openloop filtered   gain
+periodic     0.80  25.28    0.735  0.88 |    0.600    1.000    0.888 -0.288
+ar1:0.9      0.27   2.53    0.814  0.91 |    0.604    1.007    0.691 -0.087
+ar1:0.5      0.09   0.46    0.252  0.52 |    0.599    0.999    0.953 -0.354
+lorenz       0.35  13.47    0.966  0.97 |    0.600    1.001    0.522  0.078
+white        0.05   0.02    0.000  0.02 |    0.599    0.999    0.956 -0.357

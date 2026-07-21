@@ -85,7 +85,8 @@ class JEPA(nn.Module):
     def __init__(self, objective="temporal_jepa", img_size=128, patch_size=16, in_chans=10,
                  embed_dim=256, depth=6, num_heads=8, temporal_depth=4,
                  pred_dim=384, pred_depth=6, pred_heads=12,
-                 horizon=1, min_context=4, n_targets=4, grad_checkpoint=False):
+                 horizon=1, min_context=4, n_targets=4, grad_checkpoint=False,
+                 spatial_backbone="vit"):
         super().__init__()
         assert objective in ("spatial_jepa", "temporal_jepa")
         self.objective = objective
@@ -97,9 +98,18 @@ class JEPA(nn.Module):
             f"predictor width ({pred_dim}) must be NARROWER than encoder width ({embed_dim}) "
             "— the asymmetry bottleneck is half the anti-collapse mechanism."
         )
-        self.context_encoder = SITSEncoder(img_size, patch_size, in_chans, embed_dim,
-                                           depth, num_heads, temporal_depth,
-                                           grad_checkpoint=grad_checkpoint)
+        # Part 6 #8 Graph Temporal JEPA: swap the per-frame spatial ViT for a grid-graph GNN. Graph
+        # message passing over the full grid can't do disjoint spatial masking -> temporal only.
+        if spatial_backbone == "graph":
+            from .graph_encoder import GraphSITSEncoder
+            assert objective == "temporal_jepa", "graph spatial backbone supports temporal_jepa only"
+            self.context_encoder = GraphSITSEncoder(img_size, patch_size, in_chans, embed_dim,
+                                                    depth, num_heads, temporal_depth,
+                                                    grad_checkpoint=grad_checkpoint)
+        else:
+            self.context_encoder = SITSEncoder(img_size, patch_size, in_chans, embed_dim,
+                                               depth, num_heads, temporal_depth,
+                                               grad_checkpoint=grad_checkpoint)
         self.target_encoder = copy.deepcopy(self.context_encoder)
         for p in self.target_encoder.parameters():
             p.requires_grad_(False)
@@ -213,4 +223,5 @@ def build_model(cfg):
         pred_dim=pdim, pred_depth=pred["depth"], pred_heads=pheads,
         horizon=temp.get("horizon", 1), min_context=temp.get("min_context", 4),
         grad_checkpoint=enc.get("grad_checkpoint", False),
+        spatial_backbone=enc.get("spatial_backbone", "vit"),
     )

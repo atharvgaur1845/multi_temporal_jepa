@@ -1,0 +1,5 @@
+regime      |       single Δ=1    hier Δ=[1,5] hier Δ=[1,5,20]
+periodic    |            0.591           0.590           0.587
+ar1:0.9     |            0.471           0.471           0.475
+
+(higher latent-recovery R² = better; does multi-timescale prediction help?)

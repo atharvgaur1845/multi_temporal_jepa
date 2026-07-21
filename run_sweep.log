@@ -1,0 +1,16 @@
+regime            Ω     MI  ar_r2 |    JEPA    MAE    raw |  adv_raw adv_mae
+periodic      0.745  25.27  1.000 |   0.558  0.631  0.827 |   -0.270  -0.073
+ar1:0.98      0.447   4.83  0.959 |   0.470  0.545  0.738 |   -0.268  -0.074
+ar1:0.90      0.260   2.51  0.804 |   0.467  0.571  0.731 |   -0.265  -0.104
+ar1:0.80      0.181   1.55  0.632 |   0.465  0.573  0.728 |   -0.263  -0.108
+ar1:0.60      0.109   0.69  0.353 |   0.467  0.562  0.726 |   -0.259  -0.095
+ar1:0.40      0.075   0.28  0.155 |   0.472  0.569  0.725 |   -0.254  -0.097
+ar1:0.20      0.058   0.08  0.038 |   0.471  0.567  0.725 |   -0.254  -0.096
+lorenz        0.341  13.45  1.000 |   0.753  0.777  0.856 |   -0.103  -0.024
+white         0.053   0.02 -0.003 |   0.499  0.572  0.822 |   -0.323  -0.072
+
+[sweep] wrote runs/predictability_sweep.csv
+[verdict] corr(predictability Ω, JEPA-advantage-over-raw) = +0.166
+  >0 and rising -> HYPOTHESIS SUPPORTED (advantage grows with predictability)
+  ~0 / flat      -> HYPOTHESIS FALSIFIED
+[sweep] wrote runs/figures/predictability_sweep.png

@@ -56,10 +56,11 @@ class Predictor(nn.Module):
             nn.init.zeros_(self.out_proj_var.weight)
             nn.init.zeros_(self.out_proj_var.bias)
 
-    def forward(self, context_tokens, target_pos, n_targets=None):
+    def forward(self, context_tokens, target_pos, n_targets=None, horizon=None):
         """
         context_tokens : (B, N_ctx, enc_dim)   encoded visible context
         target_pos     : (B, N_tgt, enc_dim)   positional embedding of each target slot
+        horizon        : ignored here (accepted so structured predictors — Koopman/ODE — are drop-in)
                          (spatial pos for Spatial JEPA; spatial + future DOY for Temporal JEPA)
         Returns        : (B, N_tgt, enc_dim) predicted target latents (point mode), OR
                          (mu, logvar) each (B, N_tgt, enc_dim) when predict_variance=True.

@@ -49,6 +49,20 @@ def _new_backbone(cfg, meta, device):
                         temporal_period=cfg.get("temporal", {}).get("period", 366)).to(device)
 
 
+def batch_spectral_omega(data):
+    """Per-window spectral predictability Ω (torch, GPU) for the predictability-weighted curriculum
+    (Part 6 #2). data (B,W,N,F) -> (B,) in [0,1]; concentrated spectrum (predictable) -> 1, flat
+    (noise) -> 0. Computed on the per-window channel-mean signal (one small rFFT per window)."""
+    import math
+    x = data.float().mean(dim=(2, 3))                                # (B,W) per-window signal
+    x = x - x.mean(dim=1, keepdim=True)
+    power = torch.fft.rfft(x, dim=1).abs() ** 2
+    power = power[:, 1:]                                             # drop DC
+    p = power / power.sum(dim=1, keepdim=True).clamp_min(1e-12)
+    H = -(p * (p + 1e-12).log()).sum(dim=1)
+    return (1.0 - H / math.log(max(2, p.shape[1]))).clamp(0.0, 1.0)  # (B,)
+
+
 def _variance_vol_corr(logvar, data):
     """Pearson corr between the predictor's per-sample predicted volatility (pooled sigma) and a
     realized-volatility proxy from the input (within-window temporal std of the primary feature).
@@ -117,6 +131,11 @@ def train_finance_jepa(loader, cfg, meta, device, logger=print, return_model=Fal
     var_c, cov_c = loss_cfg.get("var_coeff", 1.0), loss_cfg.get("cov_coeff", 0.04)
     distributional = getattr(model, "distributional", False)
     beta = loss_cfg.get("beta", 0.5)
+    # Part 6 #2: predictability-conditioned objective weighting. When on, each window's latent-loss is
+    # weighted by its measured spectral predictability Ω^gamma -> the encoder spends capacity on the
+    # windows whose dynamics are actually learnable (an information-theoretic curriculum).
+    pred_weighted = loss_cfg.get("predictability_weighted", False)
+    pred_gamma = loss_cfg.get("predictability_gamma", 1.0)
 
     step = 0
     opt.zero_grad(set_to_none=True)
@@ -139,9 +158,12 @@ def train_finance_jepa(loader, cfg, meta, device, logger=print, return_model=Fal
                                               norm_target=loss_cfg.get("target_layernorm", True))
                 else:
                     pred, target, ctx = model(batch)
+                    sw = None
+                    if pred_weighted:
+                        sw = batch_spectral_omega(batch["data"]).clamp_min(1e-3) ** pred_gamma
                     loss = jepa_latent_loss(pred, target,
                                             norm_target=loss_cfg.get("target_layernorm", True),
-                                            loss_type=loss_cfg.get("type", "l2"))
+                                            loss_type=loss_cfg.get("type", "l2"), sample_weight=sw)
                 if var_c or cov_c:
                     std_l, cov_l = variance_covariance_reg(ctx.float())
                     loss = loss + var_c * std_l + cov_c * cov_l

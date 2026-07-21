@@ -37,12 +37,26 @@ class FinanceJEPA(nn.Module):
                  embed_dim=128, depth=4, num_heads=4, temporal_depth=4,
                  pred_dim=64, pred_depth=4, pred_heads=4,
                  horizon=1, min_context=8, n_targets=None, grad_checkpoint=False,
-                 temporal_period=366, distributional=False):
+                 temporal_period=366, distributional=False, predictor_type="transformer",
+                 horizons=None):
         super().__init__()
         assert objective in ("spatial_jepa", "temporal_jepa")
-        assert pred_dim < embed_dim, (
-            f"predictor width ({pred_dim}) must be NARROWER than encoder width ({embed_dim}) "
-            "— the asymmetry bottleneck is half the anti-collapse mechanism.")
+        # Part 6 #7 hierarchical / multi-timescale: predict SEVERAL future horizons jointly (e.g.
+        # [1,5,20]) so the encoder must model fast AND slow dynamics. None -> single horizon (default).
+        self.horizons = [int(h) for h in horizons] if horizons else [horizon]
+        self.max_horizon = max(self.horizons)
+        if len(self.horizons) > 1:
+            assert objective == "temporal_jepa" and not distributional, (
+                "hierarchical (multi-horizon) supports only temporal_jepa, point prediction")
+        # structured predictors (koopman/ode) model TIME evolution -> temporal objective only, point-only
+        self.predictor_type = predictor_type
+        if predictor_type != "transformer":
+            assert objective == "temporal_jepa" and not distributional, (
+                "structured (koopman/ode) predictors support only temporal_jepa, point prediction")
+        elif pred_dim >= embed_dim:
+            raise AssertionError(
+                f"predictor width ({pred_dim}) must be NARROWER than encoder width ({embed_dim}) "
+                "— the asymmetry bottleneck is half the anti-collapse mechanism.")
         self.objective = objective
         self.horizon = horizon
         self.min_context = min_context
@@ -59,8 +73,12 @@ class FinanceJEPA(nn.Module):
         self.target_encoder = copy.deepcopy(self.context_encoder)
         for p in self.target_encoder.parameters():
             p.requires_grad_(False)
-        self.predictor = Predictor(embed_dim, pred_dim, pred_depth, pred_heads,
-                                   predict_variance=distributional)
+        if predictor_type == "transformer":
+            self.predictor = Predictor(embed_dim, pred_dim, pred_depth, pred_heads,
+                                       predict_variance=distributional)
+        else:
+            from .structured_predictors import build_structured_predictor
+            self.predictor = build_structured_predictor(predictor_type, embed_dim)
         self.embed_dim = embed_dim
 
     # ---------------------------------------------------------------- forward
@@ -100,39 +118,47 @@ class FinanceJEPA(nn.Module):
         device = data.device
         n_real = pad_mask.sum(dim=1)                                 # (B,)
 
-        # PER-SAMPLE causal split: context = days [0..s], target = day s+horizon. Windows are fixed
-        # length and front-packed (all real), so position == chronological trading-day rank.
+        # PER-SAMPLE causal split: context = days [0..s], targets = day(s) s+Δ for Δ in horizons.
+        # Windows are front-packed (all real), so position == chronological rank.
         s_lo = self.min_context - 1
-        s_hi = n_real - 1 - self.horizon                             # (B,) inclusive
+        s_hi = n_real - 1 - self.max_horizon                         # (B,) inclusive (fits all horizons)
         if (s_hi < s_lo).any():
             raise ValueError(f"window too short: min n_real={int(n_real.min())}, "
-                             f"min_context={self.min_context}, horizon={self.horizon}")
+                             f"min_context={self.min_context}, max_horizon={self.max_horizon}")
         r = torch.rand(B, device=device)
         s = s_lo + (r * (s_hi - s_lo + 1).float()).floor().long()
         s = torch.minimum(s, s_hi)
-        tgt_idx = s + self.horizon                                   # (B,) future day
 
-        # context-only mask: hide the target day and everything after it from temporal attention
-        # (no future leakage) and from the masked-mean pool.
+        # context-only mask: hide day s+1.. from temporal attention (no future leakage) + the pool.
         ctx_mask = (torch.arange(T, device=device)[None, :] <= s[:, None]) & pad_mask  # (B,T)
         ctx_tok = self.context_encoder.encode_temporal(data, dates, ctx_mask)  # (B,T,N,D)
         m = ctx_mask.float()[:, :, None, None]
         ctx_repr = (ctx_tok * m).sum(dim=1) / m.sum(dim=1).clamp_min(1.0)       # (B,N,D) over PAST
-
         bidx = torch.arange(B, device=device)
-        tgt_frame = data[bidx, tgt_idx]                              # (B, N, F)
-        tgt_date = dates[bidx, tgt_idx]                              # (B,)
         spat = self.context_encoder.spatial_pos.unsqueeze(0)        # (1, N, D)
-        doy = doy_sincos_pos_embed(tgt_date.unsqueeze(1), self.embed_dim,
-                                   period=self.temporal_period).squeeze(1)  # (B, D)
-        target_pos = spat + doy.unsqueeze(1)                         # (B, N, D)
-        out = self.predictor(ctx_repr, target_pos)                  # (B, N, D) or (mu, logvar)
-        with torch.no_grad():
-            z_tgt = self.target_encoder.encode_full(tgt_frame)       # (B, N, D)
-        if self.distributional:
-            mu, logvar = out
+
+        def _target_pos(h):
+            tgt_date = dates[bidx, s + h]                            # (B,) future day-of-year
+            doy = doy_sincos_pos_embed(tgt_date.unsqueeze(1), self.embed_dim,
+                                       period=self.temporal_period).squeeze(1)
+            return spat + doy.unsqueeze(1)                           # (B, N, D)
+
+        if self.distributional:                                     # single-horizon β-NLL path (Phase 4)
+            h = self.horizons[0]
+            mu, logvar = self.predictor(ctx_repr, _target_pos(h), horizon=h)
+            with torch.no_grad():
+                z_tgt = self.target_encoder.encode_full(data[bidx, s + h])
             return mu, logvar, z_tgt, ctx_repr
-        return out, z_tgt, ctx_repr
+
+        # point path — single or HIERARCHICAL (predict every horizon, concat over the token axis)
+        preds, tgts = [], []
+        for h in self.horizons:
+            preds.append(self.predictor(ctx_repr, _target_pos(h), horizon=h))   # (B,N,D)
+            with torch.no_grad():
+                tgts.append(self.target_encoder.encode_full(data[bidx, s + h]))  # (B,N,D)
+        pred = torch.cat(preds, dim=1)                              # (B, K·N, D)
+        target = torch.cat(tgts, dim=1)                            # (B, K·N, D)
+        return pred, target, ctx_repr
 
     @torch.no_grad()
     def window_logvar(self, batch):
@@ -188,4 +214,6 @@ def build_finance_model(cfg, meta):
         grad_checkpoint=enc.get("grad_checkpoint", False),
         temporal_period=temp.get("period", 366),
         distributional=pred.get("distributional", False) or cfg.get("loss", {}).get("type") == "beta_nll",
+        predictor_type=pred.get("type", "transformer"),
+        horizons=temp.get("horizons"),
     )

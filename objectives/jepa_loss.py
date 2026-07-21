@@ -18,7 +18,7 @@ import torch
 import torch.nn.functional as F
 
 
-def jepa_latent_loss(pred, target, norm_target=True, loss_type="l2"):
+def jepa_latent_loss(pred, target, norm_target=True, loss_type="l2", sample_weight=None):
     """Mean error between predicted and target latents.
 
     Args
@@ -27,11 +27,12 @@ def jepa_latent_loss(pred, target, norm_target=True, loss_type="l2"):
         norm_target : apply LayerNorm (over feature dim) to `target` before the loss
         loss_type   : 'l2' (I-JEPA) or 'l1' (V-JEPA ablation); reduction is identical so the
                       two variants are directly comparable.
+        sample_weight : optional (B,) per-sample weights (Part 6 #2, predictability-conditioned
+                      curriculum). If given, the loss is a weighted mean over samples — windows whose
+                      dynamics are more predictable get more of the encoder's capacity. Normalized to
+                      mean 1 so the overall loss scale (and thus the LR interaction) is preserved.
 
-    Returns: scalar loss.
-
-    Stop-grad: `target` is detached unconditionally. Forgetting this is the #1 collapse bug;
-    tests/test_loss.py asserts target.grad is None after backward.
+    Returns: scalar loss. Stop-grad: `target` is detached unconditionally (the #1 collapse bug).
     """
     target = target.detach()
     if norm_target:
@@ -44,8 +45,11 @@ def jepa_latent_loss(pred, target, norm_target=True, loss_type="l2"):
         per_elem = (pred - target).abs()
     else:
         raise ValueError(f"unknown loss_type {loss_type!r}")
-    # mean over feature dim -> tokens -> batch
-    return per_elem.mean()
+    if sample_weight is None:
+        return per_elem.mean()                                        # mean over feat -> tokens -> batch
+    per_sample = per_elem.mean(dim=tuple(range(1, per_elem.dim())))   # (B,) mean over all but batch
+    w = sample_weight / sample_weight.mean().clamp_min(1e-6)          # normalize to mean 1
+    return (per_sample * w).mean()
 
 
 def jepa_beta_nll_loss(mu, logvar, target, beta=0.5, norm_target=True, eps=1e-6):

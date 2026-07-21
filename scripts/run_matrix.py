@@ -37,6 +37,9 @@ def enumerate_cells():
     cells.append(("tjepa_h1", {"objective": "temporal_jepa", "temporal": {"horizon": 1}}))
     for obj in ("spatial_jepa", "mae", "byol", "simclr"):
         cells.append((obj, {"objective": obj}))
+    # Part 6 #8 Graph Temporal JEPA: grid-graph GNN spatial backbone instead of the spatial ViT.
+    cells.append(("tjepa_graph", {"objective": "temporal_jepa", "temporal": {"horizon": 1},
+                                  "encoder": {"spatial_backbone": "graph"}}))
     # 1b) COMPUTE-MATCHED spatial JEPA robustness check: spatial uses ~3.5x less GPU-time/epoch
     #     than temporal (1 frame vs full context), so train it ~3.5x longer to match wall-clock and
     #     show temporal's win isn't just "more compute". Tune epochs to your card's GPU-h.
@@ -91,6 +94,10 @@ def main():
     ap.add_argument("--test", action="store_true", help="probe on test_folds (default: val_folds)")
     ap.add_argument("--resume", action="store_true",
                     help="skip cells whose encoder ckpt already exists (continue after a crash)")
+    ap.add_argument("--only", default=None,
+                    help="comma-separated cell names to run (e.g. 'tjepa_graph'); others are skipped. "
+                         "Lets you add ONE new cell against the SAME base config as the existing "
+                         "baselines without re-running or contaminating them.")
     ap.add_argument("--seed", type=int, default=None,
                     help="override training seed (for multi-seed error bars; tags outputs)")
     ap.add_argument("--cv-fold", type=int, default=None, choices=[1, 2, 3, 4, 5],
@@ -108,6 +115,13 @@ def main():
     base.setdefault("log", {})["seed"] = seed
 
     cells = enumerate_cells()
+    if args.only:
+        wanted = [c.strip() for c in args.only.split(",") if c.strip()]
+        unknown = [w for w in wanted if w not in {n for n, _ in cells}]
+        if unknown:
+            raise SystemExit(f"[run_matrix] --only names not in the matrix: {unknown}\n"
+                             f"  available: {[n for n, _ in cells]}")
+        cells = [(n, ov) for n, ov in cells if n in wanted]
     run = cells if args.max_cells is None else cells[: args.max_cells]
     skipped = [] if args.max_cells is None else cells[args.max_cells:]
 

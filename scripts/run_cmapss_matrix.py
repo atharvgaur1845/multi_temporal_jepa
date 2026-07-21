@@ -31,6 +31,12 @@ def enumerate_cells():
         ("tjepa_dist", {"objective": "temporal_jepa", "temporal": {"horizon": 1},
                         "predictor": {"distributional": True},
                         "loss": {"type": "beta_nll", "beta": 0.5}}),
+        # Part 6 #3/#4: structured latent-dynamics predictors on real degradation data.
+        # grad_checkpoint on -> numerically identical, bounds activation memory under the 6.5 GB cap.
+        ("tjepa_koopman", {"objective": "temporal_jepa", "temporal": {"horizon": 1},
+                           "predictor": {"type": "koopman"}, "encoder": {"grad_checkpoint": True}}),
+        ("tjepa_ode", {"objective": "temporal_jepa", "temporal": {"horizon": 1},
+                       "predictor": {"type": "ode"}, "encoder": {"grad_checkpoint": True}}),
         ("spatial_jepa", {"objective": "spatial_jepa"}),
         ("mae", {"objective": "mae"}),
         ("byol", {"objective": "byol"}),

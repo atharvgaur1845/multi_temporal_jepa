@@ -1,0 +1,53 @@
+# Graph Temporal JEPA (Part 6 #8) — same as tjepa_8gb.yaml but the per-frame spatial ViT is replaced
+# by a grid-graph GNN (local message passing over the PASTIS patch grid). SERVER run (PASTIS pretrain
+# is GPU-hours/cell; the graph GNN is cheaper per layer than global attention but still needs the data).
+# Temporal objective only (graph message passing can't do disjoint spatial masking).
+objective: temporal_jepa
+device: cuda
+
+encoder:
+  patch_size: 8                    # 16x16 = 256 patch-nodes/frame
+  embed_dim: 512
+  depth: 6                         # here = number of GNN (GraphSAGE) layers
+  num_heads: 8
+  temporal_depth: 4
+  grad_checkpoint: true
+  spatial_backbone: graph          # <-- the only change vs tjepa_8gb.yaml (vit -> grid-graph GNN)
+
+predictor:
+  embed_dim: 384
+  depth: 6
+  num_heads: 12
+
+ema:
+  base_momentum: 0.996
+  final_momentum: 1.0
+  schedule: linear
+
+temporal:
+  horizon: 1
+  min_context: 4
+
+loss:
+  type: l2
+  target_layernorm: true
+  stop_grad: true
+  var_coeff: 1.0
+  cov_coeff: 0.04
+
+optim:
+  name: adamw
+  lr: 1.0e-3
+  warmup_epochs: 15
+  min_lr: 1.0e-6
+  weight_decay_start: 0.04
+  weight_decay_end: 0.40
+  epochs: 100
+  batch_size: 16
+  grad_accum: 12                   # effective batch 192
+  amp: true
+  augment: true
+
+log:
+  diagnostics_every: 50
+  seed: 0
