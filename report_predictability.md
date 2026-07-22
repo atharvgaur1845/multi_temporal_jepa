@@ -117,7 +117,96 @@ Another honest negative, consistent with the pattern below.
 Its value is that it makes the project's central claim quantitative and falsifiable — and, in keeping
 with the rest of the project, it reports the confound honestly rather than forcing a clean curve.
 
-## 5. Reproducibility
-`pytest tests/test_predictability.py` (9, offline). Sweep: `python scripts/predictability_sweep.py
---device cuda:0` → `runs/predictability_sweep.csv` + `runs/figures/predictability_sweep.png`.
+## 5. The hidden confounder — predictability vs *alignment* (H1 vs H2). **UNRESOLVED.**
+
+### 5.1 The problem with §2
+
+§2 places three domains on a predictability axis and shows the win/loss pattern follows it. But the
+three domains **confound predictability with task-relevance**:
+
+| domain | predictable? | does the LABEL depend on the predictable part? |
+|---|---|---|
+| PASTIS | yes | yes (phenological cycle *is* what determines crop class) |
+| C-MAPSS | yes | yes (degradation trend *is* what RUL reads) |
+| finance | no | no |
+
+Those three points are equally consistent with two different hypotheses:
+
+> **H1** — benefit depends on the **predictability** of the process. *(the project's current thesis)*
+> **H2** — benefit depends on the **overlap** between the predictable subspace and the task-relevant
+> subspace; predictability is *necessary but not sufficient*.
+
+**Nothing in §2, or in any of the three real domains, distinguishes them.** H2 is strictly stronger:
+it makes a prediction H1 does not — that a process can be highly predictable and temporal JEPA still
+fail (or hurt), if the label reads the *unpredictable* component.
+
+### 5.2 The testbed (`data/synthetic_dynamics.generate_aligned`, `scripts/alignment_bench.py`)
+
+The latent is two independent blocks — `z_slow` (AR φ=0.95, predictable) and `z_fast` (white,
+unpredictable) — and **both are always rendered into the observation**. Only the label moves:
+
+$$y \;=\; \alpha\cdot\mathrm{std}(z_{\text{slow}}\!\cdot\! w_s)\;+\;(1-\alpha)\cdot\mathrm{std}(z_{\text{fast}}\!\cdot\! w_f)$$
+
+So **input predictability is invariant to α by construction** — asserted as a first-class property in
+`tests/test_alignment.py` (Ω and past→future MI identical across α to 1e-9; observations bitwise
+identical while labels decorrelate). Empirically the Ω spread across the sweep was 0.019 (SNR 2.0)
+and 0.006 (SNR 0.5). **The design is sound; the experiment run on it was not decisive.**
+
+### 5.3 Result — **INCONCLUSIVE**, at both sensitivities
+
+5 α-values × 3 seeds × 2 SNR configurations = 30 pretrainings. JEPA-minus-MAE advantage:
+
+| α | align. index | J−MAE @ SNR 2.0 | J−MAE @ SNR 0.5 |
+|---|---|---|---|
+| 1.00 | 0.97 | −0.053 ± 0.091 | −0.033 ± 0.049 |
+| 0.75 | 0.94 | −0.031 ± 0.066 | −0.004 ± 0.040 |
+| 0.50 | 0.53 | −0.032 ± 0.035 | +0.017 ± 0.036 |
+| 0.25 | 0.03 | −0.070 ± 0.046 | +0.000 ± 0.048 |
+| 0.00 | 0.00 | −0.103 ± 0.032 | −0.027 ± 0.046 |
+| | **corr(α, adv)** | **+0.307 (p=0.245)** | **−0.049 (p=0.860)** |
+
+**The two configurations disagree in sign and neither is significant.** Neither trend is monotone,
+and the per-α standard deviations exceed the α=1→α=0 differences. No conclusion about H1 vs H2 can
+be drawn.
+
+**Why — the instrument is insensitive.** In **0 of 30 cells** did temporal JEPA beat the
+raw-feature floor (J−raw ranged −0.16 to −0.32). The JEPA-vs-MAE contrast is therefore a comparison
+between *two encoders that both failed to reach the floor*, and any correlation across α is noise.
+This is the **same confound documented in §3** — on this synthetic testbed, small undertrained
+encoders lose to ridge-on-raw-features, so encoder-vs-encoder deltas are uninterpretable.
+
+> **A verdict-logic bug is worth recording.** The first version of `alignment_bench.py` declared
+> "H2 SUPPORTED" at SNR 2.0 on `corr = +0.307` alone — an arbitrary `corr > 0.3` threshold with no
+> significance test and no sensitivity gate. It was a **false positive** on non-significant,
+> non-monotone, noise-dominated data. The script now gates on (i) the raw floor being beaten in ≥25%
+> of cells, (ii) the α=1-vs-α=0 gap exceeding its own seed variance, and (iii) p < 0.05 — and it now
+> correctly reports INCONCLUSIVE. Had this not been caught, the project would have published a
+> stronger claim than the data supports.
+
+### 5.4 The one solid positive — the alignment index is a validated instrument
+
+`eval/predictability.alignment_index` (ridge past→present, then
+`R²(predictable part → y) / R²(full present → y)`) **tracks α at r = +0.957 (SNR 2.0) and +0.950
+(SNR 0.5) while Ω is held flat.** It is cheap, linear, label-aware, needs no pretraining, and
+measures exactly the quantity H2 says should matter. Whether it *predicts downstream benefit* is
+the open question — this testbed could not test that.
+
+### 5.5 What a decisive version needs
+
+1. **Make the learned encoders beat the raw floor** — the blocking issue. Either a genuinely
+   probe-hostile observation map (the current `tanh` is near-linear in range, so ridge inverts it),
+   or materially more capacity/epochs than the 64-dim / 2-layer / 15-epoch models used here.
+2. Only then sweep α; the design and the index are already in place and tested.
+3. Confirm on a *real* domain: C-MAPSS with a relabeled target that depends on the high-frequency
+   sensor residual rather than the degradation trend would be the natural real-data analogue.
+
+**Status: the confounder identified is real, and remains unresolved.** §2's domain-level
+correspondence stands as evidence, but it cannot separate H1 from H2, and this report should not be
+read as having done so.
+
+## 6. Reproducibility
+`pytest tests/test_predictability.py` (9) + `tests/test_alignment.py` (7), offline. Sweep:
+`python scripts/predictability_sweep.py --device cuda:0` → `runs/predictability_sweep.csv` +
+`runs/figures/predictability_sweep.png`. Alignment: `python scripts/alignment_bench.py --device
+cuda:0 --snr {2.0,0.5} --seeds 3` → `runs/alignment_bench_snr*.csv`, log `runs/alignment.log`.
 Real-domain indices: `eval.predictability.predictability_report(series)` on any (T,) or (T,D) array.

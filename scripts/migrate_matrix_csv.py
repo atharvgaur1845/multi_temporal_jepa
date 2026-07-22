@@ -9,6 +9,9 @@ seed=0 / cv_fold='' on the old rows. Writes a .bak first. Idempotent.
     python scripts/migrate_matrix_csv.py runs/matrix_results.csv
 """
 import csv, shutil, sys
+
+if len(sys.argv) != 2:
+    raise SystemExit(__doc__.strip().splitlines()[-1].strip())
 p = sys.argv[1]
 NEW = ["cell","objective","seed","cv_fold","eval_split","miou_linear","miou_conv",
        "knn_acc","gpu_hours","peak_mem_gb"]

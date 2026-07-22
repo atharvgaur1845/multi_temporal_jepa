@@ -179,6 +179,65 @@ def intrinsic_dimension(x):
     return float((lam.sum() ** 2) / ((lam ** 2).sum() + 1e-12))
 
 
+def _ridge_r2(A, b, train_frac=0.7, lam=1.0):
+    """Ridge A->b with a TEMPORAL split (no shuffling: these are time-ordered windows)."""
+    A = _as2d(A).astype(np.float64)
+    b = np.asarray(b, dtype=np.float64).reshape(len(A), -1)
+    k = max(2, int(len(A) * train_frac))
+    mu, sd = A[:k].mean(0), A[:k].std(0) + 1e-8
+    At, Ae = (A[:k] - mu) / sd, (A[k:] - mu) / sd
+    bt_mu = b[:k].mean(0)
+    w = np.linalg.solve(At.T @ At + lam * np.eye(At.shape[1]), At.T @ (b[:k] - bt_mu))
+    pred = Ae @ w + bt_mu
+    ss_res = ((b[k:] - pred) ** 2).sum()
+    ss_tot = ((b[k:] - b[k:].mean(0)) ** 2).sum()
+    return float(1.0 - ss_res / (ss_tot + 1e-12))
+
+
+def alignment_index(windows, labels, train_frac=0.7, lam=1.0):
+    """**Predictive-subspace alignment** — the fraction of LABEL-RELEVANT signal that survives inside
+    the linearly *predictable* part of the observation.
+
+    Motivation: raw predictability (Omega, past->future MI) is label-agnostic, so it cannot tell you
+    whether the predictable structure is the structure your task needs. A causal-predictive objective
+    preferentially retains predictable components, so what should govern its downstream utility is the
+    OVERLAP between the predictable subspace and the task-relevant subspace — not predictability alone.
+
+    Estimator (linear, cheap, no pretraining required):
+        1. past P = frames [0..W-2] flattened, present F = last frame.
+        2. ridge P -> F; the fitted F_hat is the part of the present that the past PREDICTS.
+        3. index = R2(F_hat -> y) / R2(F -> y)  in [0,1] (clipped).
+    ~1: the label lives in the predictable subspace (temporal prediction should help).
+    ~0: the label lives in the UNpredictable innovation (temporal prediction should be useless or
+        harmful, however predictable the process looks).
+
+    `windows` is (M, W, N, F) or (M, W, D); `labels` is (M,) or (M, k). Returns a float.
+    """
+    x = np.asarray(windows)
+    if x.ndim > 3:
+        x = x.reshape(x.shape[0], x.shape[1], -1)            # (M, W, D)
+    if x.ndim != 3 or x.shape[1] < 2:
+        raise ValueError(f"windows must be (M,W,...) with W>=2, got {np.asarray(windows).shape}")
+    y = np.asarray(labels).reshape(len(x), -1)
+    P = x[:, :-1].reshape(len(x), -1)                        # past
+    F = x[:, -1]                                             # present (what we predict)
+
+    # F_hat = the past-predictable component of the present (fit on the SAME train split the
+    # downstream probe uses, so the index is computable without touching test labels).
+    k = max(2, int(len(x) * train_frac))
+    mu, sd = P[:k].mean(0), P[:k].std(0) + 1e-8
+    Pt, Pa = (P[:k] - mu) / sd, (P - mu) / sd
+    Fm = F[:k].mean(0)
+    W_ = np.linalg.solve(Pt.T @ Pt + lam * np.eye(Pt.shape[1]), Pt.T @ (F[:k] - Fm))
+    F_hat = Pa @ W_ + Fm
+
+    r2_pred = _ridge_r2(F_hat, y, train_frac, lam)           # label from the PREDICTABLE part
+    r2_full = _ridge_r2(F, y, train_frac, lam)               # label from the full present
+    if r2_full <= 1e-6:
+        return 0.0                                           # label unreadable at all -> undefined
+    return float(np.clip(r2_pred / r2_full, 0.0, 1.0))
+
+
 def predictability_report(x):
     """All indices for a trajectory x (T,) or (T,D). Returns a flat dict."""
     return {

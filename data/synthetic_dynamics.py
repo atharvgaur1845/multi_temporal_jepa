@@ -62,6 +62,34 @@ def _latent(regime, T, d_lat, phi, rng, burn=500):
     return z.astype(np.float64)
 
 
+def _render_deep(z, obs_dim, snr, rng, hidden=32, gain=2.5, depth=2):
+    """HARD observation map: a random `depth`-layer tanh MLP, i.e. genuinely non-invertible mixing.
+
+    Engineering rationale, stated BEFORE running (see PAPER.md §5.4 — a benchmark may be repaired for
+    a named structural reason, never because a hypothesis is losing). The shallow `_render` above
+    applies ONE tanh at gain 2.0, which is near-linear over the bulk of a unit-variance latent, so
+    ridge on the raw last frame effectively inverts it. That is why the raw floor dominated every
+    learned encoder in 30/30 alignment cells (V1 resolving power FAIL) — the benchmark could not
+    reward representation learning because there was no representation to learn.
+
+    Stacking randomly-mixed tanh layers destroys linear invertibility: recovering z from x now
+    requires composing nonlinearities, which a linear probe cannot do and a learned encoder can.
+    This raises the ceiling for BOTH learned encoders symmetrically (JEPA and MAE alike) — it does
+    not favour the hypothesis under test, only the instrument's ability to resolve anything.
+    """
+    d_lat = z.shape[1]
+    h = z
+    d_in = d_lat
+    for i in range(depth):
+        d_out = hidden if i < depth - 1 else obs_dim
+        W = rng.standard_normal((d_in, d_out)) / np.sqrt(d_in)
+        h = np.tanh(gain * (h @ W))
+        d_in = d_out
+    sig_pow = h.var()
+    noise = rng.standard_normal(h.shape) * np.sqrt(sig_pow / max(1e-6, snr))
+    return (h + noise).astype(np.float32)
+
+
 def _render(z, obs_dim, snr, rng, nonlinear=True, gain=2.0):
     """x_t = φ(z_t A) + noise at target SNR (signal-power / noise-power). Returns (T, obs_dim).
 
@@ -93,6 +121,65 @@ def generate(regime="ar1", phi=0.9, T=6000, d_lat=3, obs_dim=8, W=32, snr=4.0, s
             "d_lat": z.shape[1], "obs_dim": obs_dim, "snr": snr, "n_windows": len(ends)}
     return {"data": data.astype(np.float32), "latent": latent.astype(np.float32),
             "z_full": z, "x_full": x, "meta": meta}
+
+
+def generate_aligned(alpha=1.0, T=6000, d_slow=3, d_fast=3, phi_slow=0.95, obs_dim=8, W=32,
+                     snr=2.0, stride=2, seed=0, nonlinear=True, hard_render=False):
+    """ALIGNMENT testbed — decouple *predictability* from *task-relevance* (the H1-vs-H2 confound).
+
+    The three real domains confound these: in PASTIS/C-MAPSS the predictable component IS the
+    task-relevant one, and in finance neither holds. So they cannot distinguish
+
+        H1  benefit depends on PREDICTABILITY of the process, vs
+        H2  benefit depends on the OVERLAP between the predictable subspace and the
+            task-relevant subspace (predictability necessary, not sufficient).
+
+    Construction. The latent is two independent blocks, BOTH always rendered into the observation:
+        z_slow  AR(1), phi_slow≈0.95  -> highly predictable
+        z_fast  white                 -> unpredictable (but fully visible in the CURRENT frame)
+    The label mixes them by the alignment knob alpha in [0,1]:
+        y = alpha * std(z_slow·w_s) + (1-alpha) * std(z_fast·w_f)      (then standardized)
+
+    KEY PROPERTY: x contains both blocks for every alpha, so the *observed* predictability of the
+    input (spectral Omega, past->future MI) is INVARIANT to alpha — only the label moves. Any change
+    in downstream benefit across alpha therefore isolates alignment, with predictability held fixed.
+    (The bench MEASURES this invariance rather than assuming it — if Omega drifts, the design is
+    broken and the result is void.)
+
+    Predictions: H1 -> JEPA advantage flat in alpha. H2 -> advantage falls as alpha->0, and temporal
+    JEPA should LOSE to MAE at alpha=0 despite high measured predictability (it preferentially keeps
+    the predictable z_slow and discards the z_fast the label actually needs).
+
+    Returns dict(data (M,W,N,1), label (M,), z_slow/z_fast/x_full, meta).
+    """
+    if not 0.0 <= alpha <= 1.0:
+        raise ValueError(f"alpha must be in [0,1], got {alpha}")
+    rng = np.random.default_rng(seed)
+    z_slow = _latent("ar1", T, d_slow, phi_slow, rng)              # predictable block
+    z_fast = _latent("white", T, d_fast, 0.0, rng)                 # unpredictable block
+    z = np.concatenate([z_slow, z_fast], axis=1)                   # (T, d_slow+d_fast)
+    # hard_render: deep tanh MLP -> not linearly invertible, so the raw floor stops dominating
+    # (V1 resolving power). See _render_deep for the pre-stated engineering rationale.
+    x = (_render_deep(z, obs_dim, snr, rng) if hard_render
+         else _render(z, obs_dim, snr, rng, nonlinear=nonlinear))   # BOTH blocks always observed
+
+    def _std(v):
+        return (v - v.mean()) / (v.std() + 1e-8)
+
+    # fixed readout directions (same across alpha for a given seed -> alpha is the ONLY variable)
+    w_s = rng.standard_normal(d_slow) / np.sqrt(d_slow)
+    w_f = rng.standard_normal(d_fast) / np.sqrt(d_fast)
+    y_full = _std(alpha * _std(z_slow @ w_s) + (1.0 - alpha) * _std(z_fast @ w_f))
+
+    ends = list(range(W - 1, T, stride))
+    data = np.stack([x[e - W + 1:e + 1] for e in ends], 0)[:, :, :, None]     # (M,W,N,1)
+    label = np.stack([y_full[e] for e in ends], 0)                            # (M,) at last step
+    meta = {"regime": "aligned", "alpha": alpha, "hard_render": hard_render,
+            "num_assets": obs_dim, "num_features": 1,
+            "window": W, "d_slow": d_slow, "d_fast": d_fast, "phi_slow": phi_slow,
+            "obs_dim": obs_dim, "snr": snr, "n_windows": len(ends)}
+    return {"data": data.astype(np.float32), "label": label.astype(np.float32),
+            "z_slow": z_slow, "z_fast": z_fast, "z_full": z, "x_full": x, "meta": meta}
 
 
 class DynamicsWindows(torch.utils.data.Dataset):

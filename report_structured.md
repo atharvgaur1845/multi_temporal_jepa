@@ -109,7 +109,7 @@ timescales* it predicts is not a useful lever here. (Implementation is additive/
 multi-*scale* architecture — separate encoders per timescale, à la H-JEPA — rather than multi-*horizon*
 targets on one encoder, remains the untested stronger version.)
 
-## E) Graph Temporal JEPA (Part 6 #8) — built + tested, PASTIS run pending (server)
+## E) Graph Temporal JEPA (Part 6 #8) — RUN on real PASTIS; local message passing LOSES to global attention (honest negative)
 
 The satellite spatial ViT mixes patch tokens by *global* attention; but PASTIS patches live on a grid
 with strong *local* structure (a parcel is a contiguous blob), so a GNN with local message passing over
@@ -123,10 +123,39 @@ default `vit` → **behaviour-preserving**, satellite ViT results untouched). Te
 (graph message passing over the full grid can't produce the disjoint context/target sets I-JEPA spatial
 masking needs — `encode_subset` raises).
 
-**Verified on synthetic tensors** (no PASTIS): grid-graph construction, message passing, the encoder
-interface, JEPA forward + collapse-safe grad routing, and the ViT default — `tests/test_graph.py`
-(7 pass; full suite 78 pass / 3 skip). **The PASTIS pretrain is a server run** (GPU-hours/cell; can't
-fit the 8 GB laptop):
+**Result (real PASTIS, A6000 server).** Both cells share an *identical* config (`tjepa_server.yaml`,
+patch 8, embed 512, 100 epochs, **effective batch 192**) and differ *only* in the spatial backbone;
+both were probed by the **same script, on the same val folds, at the same probe budget** (15 epochs),
+so the gap is attributable to the backbone alone.
+
+| backbone | linear mIoU ↑ | conv mIoU ↑ | parcel k-NN ↑ | eff. rank | GPU-h |
+|---|---|---|---|---|---|
+| ViT / global attention (`tjepa_h1`) | **17.91** | **22.46** | 67.63 | 252.8 | 2.12 |
+| grid-GNN / local message passing (`tjepa_graph`) | 16.79 | 20.65 | **68.05** | 249.4 | 1.95 |
+| Δ (graph − ViT) | **−1.12** | **−1.81** | +0.42 | −3.4 | −0.17 |
+
+**The local graph prior does not help — it costs ≈1.8 mIoU on segmentation** and is a wash on parcel
+k-NN (+0.42, inside noise). The result is *not* a collapse or training artifact: the graph encoder is
+representationally healthy and essentially indistinguishable from the ViT on every collapse diagnostic
+(effective rank 249.4 vs 252.8 of 512; per-dim std 0.726 vs 0.714; off-diagonal covariance 0.0046 vs
+0.0040). It simply learned a slightly *worse* representation. Probe-rerun noise is ≈0.4 mIoU (the same
+`tjepa_h1` checkpoint scores conv 22.06 under `run_matrix` and 22.46 on re-probe), so the −1.81 gap is
+≈4× noise and likely real — though this is a **single pretraining seed**, and pretrain-seed variance is
+the larger unmeasured quantity.
+
+**Why (the likely mechanism).** At patch_size 8 a 128 px tile becomes a 16×16 = 256-node grid, and a
+PASTIS parcel spans only a handful of nodes — so *locality was never the bottleneck*. Global attention
+already recovers local structure when it is useful **and** retains long-range context (field-to-field
+context, whole-tile phenology); 6 GraphSAGE layers with mean aggregation give a comparable receptive
+field on a 16×16 grid but through a strictly **lower-capacity, lower-selectivity** operator (a fixed
+uniform mean over 8 neighbours vs learned content-dependent attention weights). The GNN therefore
+trades away capacity for a locality prior that the ViT was not lacking. Per-class IoU is consistent:
+the graph loses most on the well-populated crop classes (0.195→0.140, 0.378→0.335, 0.417→0.348) while
+picking up marginal ground on a few rare ones — i.e. slightly noisier, not differently structured.
+
+**Verified on synthetic tensors before the run** (no PASTIS): grid-graph construction, message passing,
+the encoder interface, JEPA forward + collapse-safe grad routing, encoder-checkpoint round-trip, and
+the ViT default — `tests/test_graph.py` (9 pass; full suite 80 pass / 3 skip). Reproduce:
 
 ```bash
 # on the server, after scripts/download_pastis.sh.  Use the SAME base config as the existing
@@ -134,32 +163,53 @@ fit the 8 GB laptop):
 # ONLY the spatial backbone changes (clean apples-to-apples vs tjepa_h1). Do NOT pass
 # tjepa_graph.yaml as the base to the full matrix — the non-graph cells would inherit graph too.
 python scripts/run_matrix.py --config configs/model/tjepa_server.yaml --data configs/data/pastis.yaml \
-    --only tjepa_graph --device cuda:0 --resume --knn --test
-python scripts/evaluate.py --encoder-ckpt runs/matrix/tjepa_graph.pt \
-    --config configs/model/tjepa_server.yaml --data configs/data/pastis.yaml --head both --knn --test
+    --only tjepa_graph --device cuda:0 --resume --knn
+
+# head-to-head: probe BOTH checkpoints with the same script/split/budget (the table above)
+for c in tjepa_graph tjepa_h1; do
+  python scripts/evaluate.py --encoder-ckpt runs/matrix/$c.pt \
+      --config configs/model/tjepa_server.yaml --data configs/data/pastis.yaml \
+      --head both --knn --probe-epochs 15
+done
 ```
 
-Compare the resulting conv-mIoU / kNN to the ViT temporal JEPA (report.md §7) to see whether the local
-graph prior beats global attention on crop segmentation. *(Hypothesis: a modest gain — local spatial
-structure is real in SITS — but untested until the server run.)*
+*Two protocol traps this section had to fix, recorded so the comparison stays honest:* (i) the
+baselines were probed on **val**, so probing the graph cell on `--test` would have confounded backbone
+with split — both numbers above are val; (ii) `scripts/evaluate.py --encoder-ckpt` hardcoded
+`SITSEncoder`, so a graph checkpoint could not load at all — it now dispatches on the checkpoint's
+saved `encoder.spatial_backbone` (regression-tested both ways in `tests/test_graph.py`).
+
+**Hypothesis rejected.** The pre-registered expectation was *"a modest gain — local spatial structure
+is real in SITS."* It is not borne out: the gain is negative. Local spatial structure being *real* does
+not make an architectural locality prior *useful*, because global attention already captures it without
+giving up long-range context. This is the spatial-domain analogue of §D's negative — matching the
+*form* of the dynamics helps (§A/§C), but constraining a backbone that was not the bottleneck does not.
 
 ## Verdict & scope
 - **Positive:** structured dynamics priors (Koopman, Neural-ODE) improve the JEPA representation over a
   free-form predictor, scaling with predictability; the LKF's dynamics gain scales with (one-step)
   predictability and vanishes at zero — both confirm the thesis at the *method* level, complementing
   the *measurement*-level confirmation (report_predictability.md §2).
+- **Negative (§E):** a local grid-GNN spatial backbone *loses* to global attention on real PASTIS
+  (conv mIoU 20.65 vs 22.46), with no collapse to blame — a locality prior does not pay when the
+  baseline was not locality-limited.
 - **Honest limits:** margins are modest (+0.04 R²), single-seed, small synthetic models; the LKF is
   demonstrated on the true latent (a clean filter demo), not yet closed-loop through the JEPA encoder
   space (the natural next step). The Koopman is global-linear; a deep/locally-linear Koopman and a
-  Lorenz-tuned ODE would likely widen the chaotic-regime gap.
-- **Part-6 agenda now fully implemented** (all 8): #1 LKF (§B), #2 predictability-weighting
+  Lorenz-tuned ODE would likely widen the chaotic-regime gap. §E is one GNN (GraphSAGE-mean) on a
+  *grid* graph at one patch size; the stronger untested version is a true **parcel-adjacency** graph
+  from an over-segmentation, where nodes are semantic regions rather than fixed tiles — that changes
+  the graph from "a coarser way to be local" into genuine structure the ViT lacks.
+- **Part-6 agenda now fully implemented AND run** (all 8): #1 LKF (§B), #2 predictability-weighting
   (report_predictability.md §4, negative), #3 Koopman + #4 Neural-ODE (§A/§C, **positive**), #5
   distributional (Phase 4, report_finance.md §8, negative), #6 info-theoretic falsification
   (past→future-MI, report_predictability.md §2), #7 hierarchical (§D, flat), #8 graph temporal JEPA
-  (§E, built + tested, PASTIS run pending on the server).
+  (§E, **negative** on real PASTIS). No open cells remain.
 - **The through-line across all 8:** structural priors that *match the dynamics* (Koopman/ODE) help,
   on synthetic and on real C-MAPSS; generic tweaks to a free-form predictor (reweighting, extra
-  horizons, distributions) do not. The remaining open question is #8 on real PASTIS (server).
+  horizons, distributions) and priors on a component that was not the bottleneck (the graph backbone)
+  do not. **Scoreboard: 2 wins (#3, #4), 1 diagnostic confirmation (#1, #6), 4 clean negatives
+  (#2, #5, #7, #8)** — the negatives are as informative as the wins, and all are reported.
 
 ## Reproducibility
 `pytest tests/test_structured.py` (8, offline). Benchmark: `python scripts/structured_predictor_bench.py

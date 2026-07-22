@@ -37,6 +37,13 @@ def enumerate_cells():
     cells.append(("tjepa_h1", {"objective": "temporal_jepa", "temporal": {"horizon": 1}}))
     for obj in ("spatial_jepa", "mae", "byol", "simclr"):
         cells.append((obj, {"objective": obj}))
+    # FLOORS (added after the validity audit found PASTIS had none — see eval/validity.py V1).
+    # Without these, "temporal JEPA wins" cannot be shown to be a fact about LEARNING at all.
+    #   random : identical architecture, NEVER trained -> isolates the objective from the inductive
+    #            bias of the temporal-attention architecture itself.
+    #   raw    : patch-mean raw bands, no encoder -> the true no-representation floor.
+    cells.append(("random", {"objective": "random"}))
+    cells.append(("raw_features", {"objective": "raw"}))
     # Part 6 #8 Graph Temporal JEPA: grid-graph GNN spatial backbone instead of the spatial ViT.
     cells.append(("tjepa_graph", {"objective": "temporal_jepa", "temporal": {"horizon": 1},
                                   "encoder": {"spatial_backbone": "graph"}}))
@@ -198,7 +205,18 @@ def main():
                                 num_workers=8, collate_fn=collate_variable_length, drop_last=True)
             meter = GpuHourMeter(device); meter.start()
 
-            if obj in ("temporal_jepa", "spatial_jepa"):
+            if obj == "raw":
+                # no encoder, no training: patch-mean raw bands (the true floor)
+                from models.raw_encoder import RawPatchEncoder
+                encoder = RawPatchEncoder(patch_size=cfg["encoder"]["patch_size"],
+                                          in_chans=data_cfg.get("bands", 10)).to(device)
+                use_temporal = False
+            elif obj == "random":
+                # identical architecture to tjepa_h1, weights NEVER updated -> the untrained control
+                m = build_model(cfg).to(device)
+                encoder, use_temporal = m.target_encoder, True
+                del m
+            elif obj in ("temporal_jepa", "spatial_jepa"):
                 model = build_model(cfg).to(device)
                 opt = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad],
                                         lr=cfg["optim"]["lr"])
