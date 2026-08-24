@@ -10,8 +10,12 @@ This directory is self-contained. Nothing outside it is edited; source artifacts
 
 **Deadline: Sep 2, 2026 AoE.**
 
-Read `STATUS.md` first (what the data can defend), then `COMPUTE.md` (what this machine can run,
-measured). The paper skeleton in `paper/main.tex` is the template you dropped in and is canonical.
+Read `STATUS.md` first (what the data can defend), then **`slurm/README.md`** (how to actually run
+it — you have cluster access, so that is the plan; `COMPUTE.md` is the laptop fallback).
+
+`paper/main.tex` is your dropped template with **every unrun number stripped out** and replaced by a
+red `\NUM{...}` placeholder naming the run that produces it. Nothing in it is assumed from the
+drafting values. Gate before upload: `grep -n 'NUM{' paper/main.tex` must return nothing.
 
 ---
 
@@ -80,7 +84,17 @@ REO-2/
 ├── README.md                this file — plan of record
 ├── STATUS.md                provenance audit: what the checkout can defend
 ├── CHECKLIST.md             desk-reject mechanics, tick-boxes
-├── COMPUTE.md               MEASURED throughput on this card + the run schedule
+├── COMPUTE.md               measured laptop throughput — FALLBACK ONLY
+├── slurm/                   SLURM guide + job scripts — THE PLAN
+│   ├── README.md            SLURM from zero: partitions, sbatch, arrays, gotchas
+│   ├── _common.sh           shared env; edit BATCH/ACCUM here once
+│   ├── 00_env_setup.sh      login node: build the venv
+│   ├── 01_stage_pastis.sh   login node: 29 GB download (compute nodes have no internet)
+│   ├── 10_fit_batch.sbatch  find the A100 batch size before anything else
+│   ├── 20_p0_floors.sbatch  P0 — non-negotiable
+│   ├── 30_p1_seeds.sbatch   P1 — job array, 5 seeds concurrently
+│   ├── 40_noreg.sbatch      Fig 1's missing VICReg-off curve
+│   └── 50_baselines.sbatch  MAE/BYOL/SimCLR at 5 seeds
 ├── paper/
 │   ├── main.tex             the dropped REO-2 template — canonical. Compiles.
 │   ├── neurips_2026.sty     official style file, in place

@@ -1,7 +1,7 @@
 # Submission checklist
 
 **Deadline: Sep 2, 2026 AoE.** Research track, 4 pages, double-blind, non-archival.
-Compute budget and run order: `COMPUTE.md`. What the data can defend: `STATUS.md`.
+Run it on the cluster: `slurm/README.md`. Laptop fallback only: `COMPUTE.md`. What the data can defend: `STATUS.md`.
 
 
 ## Today
@@ -16,18 +16,21 @@ Compute budget and run order: `COMPUTE.md`. What the data can defend: `STATUS.md
 
 - [x] ~~Free disk~~ — now 72 GB free vs a ~58 GB peak. Thin: delete `PASTIS.zip` the instant `unzip` exits 0.
 - [x] ~~Free the GPU~~ — idle, 7737 MiB free. Benchmarked: temporal JEPA fits at 6.69 GiB reserved.
-- [ ] **Set `num_workers=2`** in `scripts/run_matrix.py:205` (and `engine/train_jepa.py:141`).
-      At `8` the dataloader wants ~5.4 GB against **3 GB of available host RAM** and will be
-      OOM-killed hours in. This already killed a benchmark run today. Not optional.
-- [ ] Close Chrome / Spotify while training. Nothing else may touch the GPU.
-- [ ] Re-download PASTIS (~29 GB, Zenodo 10.5281/zenodo.5012942, md5 `cfc441bf18137ff0bbf4fad58828fb98`).
+- [ ] ~~num_workers / close Chrome~~ — **laptop-only problems. Moot on the cluster**
+      (`--cpus-per-task=8 --mem=64G`). Only relevant if you fall back to the 4060.
+- [ ] Find your **scratch** space and its quota — PASTIS needs ~58 GB while extracting, which will
+      blow a typical home quota. `quota -s; df -h $HOME; echo $SCRATCH`
+- [ ] Stage PASTIS **from the login node** — compute nodes usually have no internet:
+      `tmux new -s pastis && bash REO-2/slurm/01_stage_pastis.sh /scratch/$USER`
+- [ ] `sbatch REO-2/slurm/10_fit_batch.sbatch`, then set `BATCH`/`ACCUM` in `slurm/_common.sh`.
+      **They must multiply to 192** or the new numbers are not comparable to the committed ones.
 - [ ] `python scripts/migrate_matrix_csv.py runs/matrix_results.csv` (8-col header -> 10-col) before
       appending any new rows.
 
 ## Runs, strict priority
 
 - [ ] **P0** — `random` + `raw_features` floors. Non-negotiable. `protocol/P0_floors.md`
-- [ ] **P1** — seed re-run, 5 seeds if compute allows. `protocol/P1_seeds.md`
+- [ ] **P1** — seed re-run at **n=5** (the cluster makes this cheap; do not settle for 3). `protocol/P1_seeds.md`
 - [ ] **P2** — temporal-order pretext baseline. `protocol/P2_temporal_ssl_baseline.md`
 - [ ] **P3** — fine-tuning cell. Stretch. `protocol/P3_finetune.md`
 - [ ] P0-addendum — `tjepa_noreg` on PASTIS, or Fig 1 cannot be drawn.
@@ -42,7 +45,7 @@ Compute budget and run order: `COMPUTE.md`. What the data can defend: `STATUS.md
 The abstract asserts all of them.
 
 - [ ] Every one of those numbers either regenerated from a committed CSV, or removed.
-- [ ] `grep -n "TBD" paper/main.tex` returns nothing.
+- [ ] `grep -n 'NUM{' paper/main.tex` returns nothing (19 placeholders at last count).
 - [ ] The `n` actually reached is what the paper says — not `3` because the template said `3`.
 
 ## Content

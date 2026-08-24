@@ -39,6 +39,18 @@
 \hypersetup{pdfauthor={},pdftitle={},pdfsubject={},pdfkeywords={},
             pdfcreator={},pdfproducer={}}
 
+% ---------------------------------------------------------------------
+% EVERY quantitative claim starts as \NUM{what-produces-it} and is replaced
+% ONLY by a number regenerated from a committed CSV. Renders in red so it is
+% impossible to miss in the compiled PDF.
+%   Pre-upload gate:   grep -n 'NUM{' main.tex     -> must return nothing
+% The values the drafting template carried (22.3+-1.8, p=0.041, 61.3%,
+% 9.2/13.1/15.9, erank 2.4) are NOT reproducible from this checkout -- see
+% ../STATUS.md. They were removed rather than carried forward.
+% ---------------------------------------------------------------------
+\usepackage{xcolor}
+\newcommand{\NUM}[1]{\textcolor{red}{\textbf{[#1]}}}
+
 
 % ---------------------------------------------------------------------
 % TITLE — leads with the failure mode, not the benchmark win.
@@ -64,14 +76,14 @@ Predicting the \emph{future} latent state of a location from its past should be 
 better-matched objective. We show that a direct port of the JEPA objective to
 Sentinel-2 time series \textbf{collapses}: because consecutive acquisitions of a parcel are
 near-identical, future-latent prediction is solvable by emitting a constant
-(loss $\to 0$, per-dimension std $0.04$, effective rank $2.4$ of $512$).
+(loss $\to 0$, per-dimension std \NUM{noreg}, effective rank \NUM{noreg} of $512$).
 Adding variance--covariance regularization on the context embedding removes the
 degenerate solution. With it, causal temporal prediction outperforms spatial masking
-by $+6.0$ mIoU on PASTIS crop segmentation under a frozen probe
-($22.3$ vs.\ $16.2$, paired $t$-test $p=0.041$, 3 seeds), and the margin widens from
-$+37\%$ at full supervision to $+100\%$ at $1\%$ labels. Probing frozen spatial features
+by \NUM{P1} mIoU on PASTIS crop segmentation under a frozen probe
+(\NUM{P1} vs.\ \NUM{P1}, paired $t$-test $p=\NUM{P1}$, $n=\NUM{P1}$ seeds), and the margin widens from
+\NUM{fewshot} at full supervision to \NUM{fewshot} at $1\%$ labels. Probing frozen spatial features
 shows the objective makes the representation phenology-aware: acquisition month decodes at
-$61.3\%$ vs.\ $46.3\%$ (chance $8.3\%$).
+\NUM{mech} vs.\ \NUM{mech} (chance $8.3\%$).
 \end{abstract}
 
 % =====================================================================
@@ -139,8 +151,11 @@ Day-of-year enters only as a periodic encoding; chronological order is the acqui
 %   - Sentinel-2 revisit is ~5 days; land surface changes on a phenological timescale.
 %     So z_{t+1} ~= z_t for most (parcel, t). The predictor's optimal solution under an
 %     unregularized latent loss is the identity, and the encoder's is a constant.
-%   - Measured, lambda_v = lambda_c = 0: loss -> 0, per-dim std 0.04, effective rank 2.4/512.
-%   - With var-cov on: std holds ~1.0, effective rank ~430/512 (train), ~250 (eval-pool).
+%   - lambda_v = lambda_c = 0: loss -> 0, per-dim std ?, effective rank ?/512.
+%     !! NOT MEASURED IN THIS CHECKOUT. tjepa_noreg was SKIPPED in every committed
+%     !! PASTIS pass. Run it (protocol/P0_floors.md addendum) before writing this.
+%   - With var-cov on: std ~1.0, effective rank ~454/512 at 2950 steps -- THIS HALF IS REAL,
+%     parsed from run.log by figures/fig1_effective_rank.py.
 %   - Why this matters to the EO community: it plausibly explains why latent-prediction
 %     objectives have not been reported to work on SITS. State this as a hypothesis, not fact.
 %
@@ -152,7 +167,7 @@ Day-of-year enters only as a periodic encoding; chronological order is the acqui
   % \includegraphics[width=0.7\linewidth]{fig1_effective_rank.pdf}
   \caption{Effective rank of the context embedding over pretraining on PASTIS.
   Without variance--covariance regularization the representation collapses to
-  rank $\approx 2.4$ of $512$ while the prediction loss goes to zero --- the degenerate
+  rank \NUM{noreg} of $512$ while the prediction loss goes to zero --- the degenerate
   solution admitted by near-identical consecutive acquisitions.}
   \label{fig:collapse}
 \end{figure}
@@ -180,24 +195,26 @@ Day-of-year enters only as a periodic encoding; chronological order is the acqui
 % ---------------------------------------------------------------------
 \begin{table}[t]
   \caption{PASTIS crop segmentation, frozen encoder, validation fold.
-  Mean $\pm$ std over 3 seeds; paired $t$-test against temporal $\Delta{=}1$.
+  Mean $\pm$ std over $n$ seeds, \textbf{$n$ stated per row}; paired $t$-test against
+  temporal $\Delta{=}1$.
   All methods use an identical backbone and effective batch 192 for 100 epochs.}
   \label{tab:main}
   \centering
-  \begin{tabular}{lccc}
+  \begin{tabular}{lcccc}
     \toprule
-    Objective & conv mIoU & $p$ vs.\ temporal & parcel $k$-NN \\
+    Objective & conv mIoU & $n$ & $p$ vs.\ temporal & parcel $k$-NN \\
     \midrule
-    Raw spectral features      & FLOOR-TBD & FLOOR-TBD & FLOOR-TBD \\
-    Random-init encoder        & FLOOR-TBD & FLOOR-TBD & FLOOR-TBD \\
+    Raw spectral features      & \NUM{P0} & \NUM{P0} & \NUM{P0} & \NUM{P0} \\
+    Random-init encoder        & \NUM{P0} & \NUM{P0} & \NUM{P0} & \NUM{P0} \\
     \midrule
-    MAE                        & TBD       & 0.001--0.009 & 54.4 \\
-    SimCLR                     & TBD       & 0.001--0.009 & 54.6 \\
-    BYOL                       & TBD       & 0.001--0.009 & 62.7 \\
-    Spatial JEPA               & 16.2      & 0.041 & 58.7 \\
-    Spatial JEPA (compute-matched, $3.5\times$ epochs) & $15.8 \pm 1.2$ & 0.036 & -- \\
+    MAE                        & \NUM{P1} & \NUM{P1} & \NUM{P1} & \NUM{P1} \\
+    SimCLR                     & \NUM{P1} & \NUM{P1} & \NUM{P1} & \NUM{P1} \\
+    BYOL                       & \NUM{P1} & \NUM{P1} & \NUM{P1} & \NUM{P1} \\
+    Temporal-order pretext     & \NUM{P2} & \NUM{P2} & \NUM{P2} & \NUM{P2} \\
+    Spatial JEPA               & \NUM{P1} & \NUM{P1} & \NUM{P1} & \NUM{P1} \\
+    Spatial JEPA (compute-matched, $3.5\times$ epochs) & \NUM{P1} & \NUM{P1} & \NUM{P1} & -- \\
     \midrule
-    \textbf{Temporal JEPA ($\Delta{=}1$)} & $\mathbf{22.3 \pm 1.8}$ & --- & \textbf{65.5} \\
+    \textbf{Temporal JEPA ($\Delta{=}1$)} & \NUM{P1} & \NUM{P1} & --- & \NUM{P1} \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -209,8 +226,8 @@ Day-of-year enters only as a periodic encoding; chronological order is the acqui
   \centering
   % \includegraphics[width=0.7\linewidth]{fig2_label_efficiency.pdf}
   \caption{Test-fold mIoU at $1/5/10/100\%$ label fractions.
-  Temporal: $9.2 / 13.1 / 15.9$; spatial: $4.6 / 6.9 / 9.5$.
-  The advantage grows from $+37\%$ at full supervision to $+100\%$ at $1\%$ labels.}
+  Temporal: \NUM{fewshot}; spatial: \NUM{fewshot}.
+  The advantage grows from \NUM{fewshot} at full supervision to \NUM{fewshot} at $1\%$ labels.}
   \label{fig:labeleff}
 \end{figure}
 
@@ -221,7 +238,9 @@ Day-of-year enters only as a periodic encoding; chronological order is the acqui
 % (a) Main comparison. +6.0 over spatial, p=0.041. Reference floors from Table 1.
 % (b) The win is the objective, not compute. Compute-matched spatial at 3.5x epochs
 %     gets 15.8 +- 1.2 — no better. p=0.036.
-% (c) Horizon insensitivity. Delta = 1/2/4/8 -> 22.3/20.8/21.8/22.6, all overlapping,
+% (c) Horizon insensitivity. Delta = 1/2/4/8 -> ?, all overlapping,
+%     (single-seed run.log has 22.06/19.07/18.98/21.85 -- NOT the 3-seed values the
+%      drafting template quoted. Re-derive from P1.)
 %     none differs from Delta=1 (p > 0.1), every horizon beats spatial. Frame as a
 %     robustness result: the effect is not a tuned-hyperparameter artifact.
 % (d) Label efficiency -> Figure 2.
@@ -236,9 +255,10 @@ Day-of-year enters only as a periodic encoding; chronological order is the acqui
 % encoding and probing it would be circular. Reviewers WILL check this. Saying it
 % first is worth a paragraph of goodwill.
 %
-%   Temporal JEPA: 61.3% month accuracy, 30.4 d circular DOY MAE
-%   Spatial JEPA:  46.3% month accuracy, 41.8 d
-%   Chance:         8.3%
+%   Temporal JEPA: ?% month accuracy, ? d circular DOY MAE
+%   Spatial JEPA:  ?% month accuracy, ? d
+%   Chance:         8.3%   (this one is arithmetic: 1/12)
+%   !! scripts/mechanistic.py PRINTS these and writes no file. Regenerate + tee.
 %
 % Then the inference, hedged correctly: crop classes are separated by phenological stage,
 % which tracks season; so a season-aware representation is crop-discriminative.
@@ -248,8 +268,9 @@ Day-of-year enters only as a periodic encoding; chronological order is the acqui
 \section{Limitations}
 % BUDGET: ~0.2 page. DO NOT CUT THIS SECTION. It is cheap and it buys reviewer trust.
 % State plainly, no hedging language:
-%   - n = 3 seeds. Wilcoxon is uninformative at n=3 (minimum two-sided p = 0.25),
-%     so only the paired t-test is reported.
+%   - n = ? seeds, STATED PER ROW in Table 1. Wilcoxon is uninformative at n=3
+%     (minimum two-sided p = 0.25); at n=5 the minimum is 0.0625. Report which
+%     test you ran and why. Do NOT write "3" because this template said "3".
 %   - Single dataset. No second SITS benchmark yet.
 %   - Frozen probe only; no end-to-end fine-tuning comparison.  [DELETE IF YOU RUN IT]
 %   - No non-predictive temporal SSL baseline (e.g. frame-order pretext), so

@@ -24,7 +24,17 @@ At n=3 the Wilcoxon signed-rank test has a **minimum attainable two-sided p of 0
 reach significance at any effect size. The reported `p = 0.041` is a paired *t*-test on three points,
 which is one unlucky seed away from nothing. **Go to 5 seeds if compute allows.**
 
-## Compute reality (see `../STATUS.md`)
+## SUPERSEDED — cluster access changes this section
+
+The reduction below (n=5 on four cells, n=1 on MAE/BYOL/SimCLR) existed **only** because the 8 GB
+laptop made BYOL+SimCLR cost ~90 GPU-h. With `gpu_a100_8` that constraint is gone: run the **full
+matrix at n=5** and delete the unequal-`n` line from Limitations entirely.
+See `../slurm/README.md`; the runs are `30_p1_seeds.sbatch` and `50_baselines.sbatch`.
+
+The reasoning below is kept because the *statistical* argument (n=3 is too few) still stands, and
+because the laptop remains the fallback if cluster access lapses before Sep 2.
+
+## Compute reality on the laptop (fallback)
 
 Server gpu-h per cell, from the committed CSV: `tjepa_h1` 2.12, `spatial_jepa` 0.58, `mae` 0.49,
 `byol` 9.93, `simclr` 7.81. The card here is an **8 GB laptop 4060**, currently at 6.4/8.2 GB under an
