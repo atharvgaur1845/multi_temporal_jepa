@@ -1,0 +1,138 @@
+% =====================================================================
+% VERIFICATION STATUS — read before compiling.
+%
+% Under the NeurIPS LLM policy the authors own citation correctness. A
+% fabricated reference caught by THIS reviewer pool (the workshop is run
+% by the PASTIS author) costs far more than any citation is worth.
+%
+%   [VERIFY]  ID believed correct, NOT yet resolved against arxiv.org
+%   [DANGER]  do not cite until resolved — see the note on each entry
+%
+% Resolve every entry before submission, e.g.:
+%   for id in 2301.08243 2404.08471 2105.04906 2111.06377 2006.07733 \
+%             2002.05709 1807.03748 2107.07933 ; do
+%     curl -sI "https://arxiv.org/abs/$id" | head -1 ; done
+% and check that the returned TITLE matches, not merely that the ID resolves.
+% =====================================================================
+
+% ---------- core SSL ----------
+
+@inproceedings{assran2023ijepa,          % [VERIFY] arXiv 2301.08243
+  title     = {Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture},
+  author    = {Assran, Mahmoud and Duval, Quentin and Misra, Ishan and Bojanowski, Piotr and
+               Vincent, Pascal and Rabbat, Michael and LeCun, Yann and Ballas, Nicolas},
+  booktitle = {CVPR},
+  year      = {2023}
+}
+
+@article{bardes2024vjepa,                % [VERIFY] arXiv 2404.08471
+  title  = {Revisiting Feature Prediction for Learning Visual Representations from Video},
+  author = {Bardes, Adrien and Garrido, Quentin and Ponce, Jean and Rabbat, Michael and
+            LeCun, Yann and Assran, Mahmoud and Ballas, Nicolas},
+  year   = {2024}
+}
+
+@inproceedings{bardes2022vicreg,         % [VERIFY] arXiv 2105.04906
+  title     = {VICReg: Variance-Invariance-Covariance Regularization for Self-Supervised Learning},
+  author    = {Bardes, Adrien and Ponce, Jean and LeCun, Yann},
+  booktitle = {ICLR},
+  year      = {2022}
+}
+
+@inproceedings{he2022mae,                % [VERIFY] arXiv 2111.06377
+  title     = {Masked Autoencoders Are Scalable Vision Learners},
+  author    = {He, Kaiming and Chen, Xinlei and Xie, Saining and Li, Yanghao and
+               Doll{\'a}r, Piotr and Girshick, Ross},
+  booktitle = {CVPR},
+  year      = {2022}
+}
+
+@inproceedings{grill2020byol,            % [VERIFY] arXiv 2006.07733
+  title     = {Bootstrap Your Own Latent: A New Approach to Self-Supervised Learning},
+  author    = {Grill, Jean-Bastien and Strub, Florian and Altch{\'e}, Florent and others},
+  booktitle = {NeurIPS},
+  year      = {2020}
+}
+
+@inproceedings{chen2020simclr,           % [VERIFY] arXiv 2002.05709
+  title     = {A Simple Framework for Contrastive Learning of Visual Representations},
+  author    = {Chen, Ting and Kornblith, Simon and Norouzi, Mohammad and Hinton, Geoffrey},
+  booktitle = {ICML},
+  year      = {2020}
+}
+
+@article{oord2018cpc,                    % [VERIFY] arXiv 1807.03748
+  title  = {Representation Learning with Contrastive Predictive Coding},
+  author = {van den Oord, Aaron and Li, Yazhe and Vinyals, Oriol},
+  year   = {2018}
+}
+
+% ---------- Earth observation ----------
+
+@inproceedings{garnot2021pastis,         % [VERIFY] arXiv 2107.07933 — the dataset paper.
+                                         % The workshop is run by its author. Get this one exactly
+                                         % right: authors, venue, year, and the DOI below.
+  title     = {Panoptic Segmentation of Satellite Image Time Series with Convolutional
+               Temporal Attention Networks},
+  author    = {Sainte Fare Garnot, Vivien and Landrieu, Loic},
+  booktitle = {ICCV},
+  year      = {2021},
+  note      = {PASTIS, Zenodo DOI 10.5281/zenodo.5012942}
+}
+
+@inproceedings{cong2022satmae,           % [VERIFY] ID not recorded in the repo bibliography.
+  title     = {SatMAE: Pre-training Transformers for Temporal and Multi-Spectral Satellite Imagery},
+  author    = {Cong, Yezhen and Khanna, Samar and Meng, Chenlin and others},
+  booktitle = {NeurIPS},
+  year      = {2022}
+}
+
+@article{wang2023ssl4eo,                 % [VERIFY] ID not recorded in the repo bibliography.
+  title  = {SSL4EO-S12: A Large-Scale Multi-Modal, Multi-Temporal Dataset for Self-Supervised
+            Learning in Earth Observation},
+  author = {Wang, Yi and Braham, Nassim Ait Ali and Xiong, Zhitong and others},
+  year   = {2023}
+}
+
+% ---------- time series SSL ----------
+
+@inproceedings{yue2022ts2vec,            % [VERIFY] ID not recorded in the repo bibliography.
+  title     = {TS2Vec: Towards Universal Representation of Time Series},
+  author    = {Yue, Zhihan and Wang, Yujing and Duan, Juanyong and others},
+  booktitle = {AAAI},
+  year      = {2022}
+}
+
+% ---------- diagnostics ----------
+
+@inproceedings{roy2007erank,             % no arXiv — conference paper, verify page numbers
+  title     = {The Effective Rank: A Measure of Effective Dimensionality},
+  author    = {Roy, Olivier and Vetterli, Martin},
+  booktitle = {EUSIPCO},
+  year      = {2007}
+}
+
+% =====================================================================
+% [DANGER] — DO NOT CITE UNTIL RESOLVED
+%
+% README.md:416 and PAPER.md 6.2 cite:
+%     "distributional JEPA appears as VJEPA (arXiv 2601.14354)
+%      and Var-JEPA (arXiv 2603.20111)"
+%
+% Two reasons to treat both as fabricated until proven otherwise:
+%
+%  1. The same bibliography (README.md IX.9) ALREADY lists
+%     "Bardes et al., V-JEPA, 2024 (2404.08471)" — the real V-JEPA — and
+%     then lists "VJEPA (arXiv 2601.14354)" separately as a second,
+%     different paper. One entry describes a paper that exists; the other
+%     asserts a second paper with the same name and a different ID.
+%  2. Neither ID appears anywhere else in the repo: no bib entry, no URL,
+%     no title, no author list, no venue. Both are bare numbers.
+%
+% These are the two IDs most likely to be checked, because they are the
+% two the reader cannot place. Resolve each ID AND confirm the returned
+% title matches the claim. If either does not resolve, delete the claim —
+% the sentence it supports ("distributional JEPA is prior art") is not
+% load-bearing for this submission, which does not use distributional
+% JEPA at all. Deleting costs nothing.
+% =====================================================================

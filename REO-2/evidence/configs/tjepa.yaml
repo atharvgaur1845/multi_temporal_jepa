@@ -1,0 +1,60 @@
+# Temporal JEPA model + training config.
+objective: temporal_jepa           # one of: temporal_jepa | spatial_jepa | mae | byol | simclr
+device: cuda                       # SINGLE GPU knob: cuda | cuda:1 | cuda:2 | cpu (or --device)
+
+encoder:
+  patch_size: 8                    # 128/8 = 16x16 = 256 tokens/frame (4x finer than P16 -> much
+                                   # better DENSE mIoU; P16 = 64 tokens is the cheap/coarse option)
+  embed_dim: 512                   # ablation grid: {128, 256, 512, 768}
+  depth: 6                         # spatial ViT depth
+  num_heads: 8                     # head_dim = 512/8 = 64
+  temporal_depth: 4                # factorized temporal transformer depth
+  grad_checkpoint: true            # REQUIRED at P8 — recompute activations in backward
+
+predictor:
+  # MUST be narrower than encoder.embed_dim — the asymmetry bottleneck is half the anti-collapse
+  # mechanism. I-JEPA's literal 384 is relative to a ViT-H encoder (1280); the invariant that
+  # matters is predictor < encoder. With encoder 512 we use the I-JEPA value 384 (0.75x).
+  # build_model auto-clamps if a config ever sets predictor >= encoder.
+  embed_dim: 384
+  depth: 6                         # ablation grid: {1, 2, 4, 6}
+  num_heads: 12                    # head_dim = 384/12 = 32
+
+ema:
+  base_momentum: 0.996
+  final_momentum: 1.0
+  schedule: linear                 # I-JEPA paper = linear ramp
+
+temporal:
+  horizon: 1                       # Δ in acquisition steps; horizon study sweeps {1, 2, 4, 8}
+  min_context: 4                   # minimum number of past acquisitions in the context
+
+loss:
+  type: l2                         # I-JEPA = L2; ablate L1 (V-JEPA)
+  target_layernorm: true           # LayerNorm targets before loss
+  stop_grad: true                  # MANDATORY on target branch
+  # VICReg-style anti-collapse on the trainable context embedding. Temporal SITS JEPA collapses
+  # easily (future ≈ present), so these are ON by default. Set both to 0.0 for pure I-JEPA.
+  var_coeff: 1.0                   # variance hinge: keep per-dim std >= 1
+  cov_coeff: 0.04                  # covariance: decorrelate embedding dims
+
+optim:
+  name: adamw
+  lr: 1.0e-3
+  warmup_epochs: 15
+  min_lr: 1.0e-6
+  weight_decay_start: 0.04
+  weight_decay_end: 0.40
+  epochs: 100
+  # Memory: per-step batch is the lever; grad_accum raises the EFFECTIVE batch for FREE (grads
+  # accumulate, no extra memory). Calibrated for ~15-16 GB at patch_size 8 + embed 512 +
+  # grad_checkpoint + max_seq_len 32: est peak ~10.8 GB at batch 32 (model: 0.0096*B*T + 0.95).
+  batch_size: 32                   # ~10.8 GB at P8/T32; raise to 40 (~13 GB) if nvidia-smi shows room
+  grad_accum: 6                    # effective batch = batch_size * grad_accum = 192
+  amp: true
+  augment: true                    # random H/V flips during pretraining (label-free)
+  # weight_decay is cosine-ramped weight_decay_start -> weight_decay_end over training.
+
+log:
+  diagnostics_every: 50            # steps; ALWAYS pair loss with collapse diagnostics + a probe
+  seed: 0

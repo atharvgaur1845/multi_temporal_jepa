@@ -1,0 +1,74 @@
+2:[run_matrix] 16 cells total; running 5; skipping 11
+3:[run_matrix] SKIPPED (budget): tjepa_h2
+4:[run_matrix] SKIPPED (budget): tjepa_h4
+5:[run_matrix] SKIPPED (budget): tjepa_h8
+6:[run_matrix] SKIPPED (budget): tjepa_preddepth1
+7:[run_matrix] SKIPPED (budget): tjepa_preddepth2
+8:[run_matrix] SKIPPED (budget): tjepa_preddepth4
+9:[run_matrix] SKIPPED (budget): tjepa_preddepth6
+10:[run_matrix] SKIPPED (budget): tjepa_dim128
+11:[run_matrix] SKIPPED (budget): tjepa_dim256
+12:[run_matrix] SKIPPED (budget): tjepa_dim512
+13:[run_matrix] SKIPPED (budget): tjepa_dim768
+14:[run_matrix] device = cuda:0
+15:[run_matrix] probing on val folds [4]
+16:[run_matrix] tjepa_h1: already complete (runs/matrix/tjepa_h1.pt) -> resume skip
+17:[run_matrix] spatial_jepa: already complete (runs/matrix/spatial_jepa.pt) -> resume skip
+18:[run_matrix] mae: already complete (runs/matrix/mae.pt) -> resume skip
+81:[run_matrix] 16 cells total; running 5; skipping 11
+82:[run_matrix] SKIPPED (budget): tjepa_h2
+83:[run_matrix] SKIPPED (budget): tjepa_h4
+84:[run_matrix] SKIPPED (budget): tjepa_h8
+85:[run_matrix] SKIPPED (budget): tjepa_preddepth1
+86:[run_matrix] SKIPPED (budget): tjepa_preddepth2
+87:[run_matrix] SKIPPED (budget): tjepa_preddepth4
+88:[run_matrix] SKIPPED (budget): tjepa_preddepth6
+89:[run_matrix] SKIPPED (budget): tjepa_dim128
+90:[run_matrix] SKIPPED (budget): tjepa_dim256
+91:[run_matrix] SKIPPED (budget): tjepa_dim512
+92:[run_matrix] SKIPPED (budget): tjepa_dim768
+93:[run_matrix] device = cuda:0
+94:[run_matrix] probing on val folds [4]
+95:[run_matrix] tjepa_h1: already complete (runs/matrix/tjepa_h1.pt) -> resume skip
+96:[run_matrix] spatial_jepa: already complete (runs/matrix/spatial_jepa.pt) -> resume skip
+97:[run_matrix] mae: already complete (runs/matrix/mae.pt) -> resume skip
+160:[run_matrix] 16 cells total; running 5; skipping 11
+161:[run_matrix] SKIPPED (budget): tjepa_h2
+162:[run_matrix] SKIPPED (budget): tjepa_h4
+163:[run_matrix] SKIPPED (budget): tjepa_h8
+164:[run_matrix] SKIPPED (budget): tjepa_preddepth1
+165:[run_matrix] SKIPPED (budget): tjepa_preddepth2
+166:[run_matrix] SKIPPED (budget): tjepa_preddepth4
+167:[run_matrix] SKIPPED (budget): tjepa_preddepth6
+168:[run_matrix] SKIPPED (budget): tjepa_dim128
+169:[run_matrix] SKIPPED (budget): tjepa_dim256
+170:[run_matrix] SKIPPED (budget): tjepa_dim512
+171:[run_matrix] SKIPPED (budget): tjepa_dim768
+172:[run_matrix] device = cuda:2
+173:[run_matrix] probing on val folds [4]
+174:[run_matrix] tjepa_h1: already complete (runs/matrix/tjepa_h1.pt) -> resume skip
+175:[run_matrix] spatial_jepa: already complete (runs/matrix/spatial_jepa.pt) -> resume skip
+176:[run_matrix] mae: already complete (runs/matrix/mae.pt) -> resume skip
+357:[run_matrix] byol: linear=5.48 conv=4.99 knn=0.6266 gpu_h=9.93
+538:[run_matrix] simclr: linear=3.82 conv=8.29 knn=0.5456 gpu_h=7.81
+540:[run_matrix] 17 cells total; running 17; skipping 0
+541:[run_matrix] device = cuda:2
+542:[run_matrix] probing on val folds [4]
+543:[run_matrix] tjepa_h1: already complete (runs/matrix/tjepa_h1.pt) -> resume skip
+544:[run_matrix] spatial_jepa: already complete (runs/matrix/spatial_jepa.pt) -> resume skip
+545:[run_matrix] mae: already complete (runs/matrix/mae.pt) -> resume skip
+546:[run_matrix] byol: already complete (runs/matrix/byol.pt) -> resume skip
+547:[run_matrix] simclr: already complete (runs/matrix/simclr.pt) -> resume skip
+1178:[run_matrix] spatial_jepa_matched: linear=13.49 conv=15.62 knn=0.666 gpu_h=2.07
+1359:[run_matrix] tjepa_h2: linear=15.85 conv=19.07 knn=0.668 gpu_h=2.13
+1540:[run_matrix] tjepa_h4: linear=15.15 conv=18.98 knn=0.6743 gpu_h=2.13
+1721:[run_matrix] tjepa_h8: linear=17.07 conv=21.85 knn=0.6763 gpu_h=2.13
+1902:[run_matrix] tjepa_preddepth1: linear=14.66 conv=17.98 knn=0.6639 gpu_h=2.10
+2083:[run_matrix] tjepa_preddepth2: linear=15.67 conv=19.18 knn=0.6784 gpu_h=2.11
+2264:[run_matrix] tjepa_preddepth4: linear=16.94 conv=20.81 knn=0.6743 gpu_h=2.12
+2445:[run_matrix] tjepa_preddepth6: linear=17.46 conv=21.36 knn=0.6867 gpu_h=4.08
+2627:[run_matrix] tjepa_dim128: linear=11.81 conv=21.71 knn=0.6784 gpu_h=1.18
+2809:[run_matrix] tjepa_dim256: linear=16.87 conv=24.01 knn=0.6867 gpu_h=1.22
+2990:[run_matrix] tjepa_dim512: linear=17.09 conv=21.20 knn=0.6805 gpu_h=2.15
+2991:[run_matrix] tjepa_dim768: embed>=768 -> batch 8, accum 24 (memory safety)
+3354:[run_matrix] tjepa_dim768: linear=6.31 conv=6.76 knn=0.5083 gpu_h=4.38

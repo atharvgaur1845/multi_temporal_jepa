@@ -1,0 +1,272 @@
+% =====================================================================
+% REO-2 @ NeurIPS 2026  —  Research Track
+% Deadline: Sep 2, 2026 AoE   |   Portal: cmt3.research.microsoft.com/REO2026
+% 4 pages MAX (references + appendix excluded). Double-blind. Non-archival.
+%
+% SETUP:
+%   1. Open the official NeurIPS 2026 Overleaf template.
+%   2. Replace its main.tex with this file. Keep neurips_2026.sty.
+%   3. DELETE from the template: \newpage and \input{checklist.tex}
+%
+% ANONYMITY CHECKLIST BEFORE UPLOAD:
+%   [ ] No author names, no affiliations, no acknowledgements
+%   [ ] No github.com/<username> — use anonymous.4open.science or omit
+%   [ ] No "in our previous work" self-citations
+%   [ ] Strip PDF metadata:  exiftool -all= main.pdf
+%   [ ] Verify EVERY arXiv ID in refs.bib actually resolves
+% =====================================================================
+
+\documentclass{article}
+
+\usepackage[dblblindworkshop]{neurips_2026}
+\workshoptitle{2nd Workshop on Advances in Representation Learning for Earth Observation}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{nicefrac}
+\usepackage{microtype}
+\usepackage{graphicx}
+
+% Blank the PDF metadata. LaTeX/hyperref leak identifying strings into PDF
+% properties even with an empty \author, and that is a real desk-reject cause
+% under double-blind. exiftool is NOT installed on this machine, so this is the
+% primary defence -- verify the result with `pdfinfo main.pdf`.
+\hypersetup{pdfauthor={},pdftitle={},pdfsubject={},pdfkeywords={},
+            pdfcreator={},pdfproducer={}}
+
+
+% ---------------------------------------------------------------------
+% TITLE — leads with the failure mode, not the benchmark win.
+% Alternatives if this reads too negative:
+%   "Predicting the Future Latent Learns Phenology: Temporal JEPA for Sentinel-2"
+%   "Temporal Redundancy Makes Latent Prediction Degenerate on Sentinel-2 Time Series"
+% ---------------------------------------------------------------------
+\title{Temporal Redundancy Breaks JEPA on Satellite Image Time Series}
+
+\author{}   % LEAVE EMPTY — double-blind
+
+\begin{document}
+\maketitle
+
+% ---------------------------------------------------------------------
+% ABSTRACT  (~150 words. Written last. Every number here must appear in a table.)
+% Arc: EO is temporal -> naive port collapses -> why -> fix -> result -> mechanism
+% ---------------------------------------------------------------------
+\begin{abstract}
+Earth observation data is natively a time series of the same location, yet most
+self-supervised objectives for satellite imagery treat acquisitions independently.
+Predicting the \emph{future} latent state of a location from its past should be the
+better-matched objective. We show that a direct port of the JEPA objective to
+Sentinel-2 time series \textbf{collapses}: because consecutive acquisitions of a parcel are
+near-identical, future-latent prediction is solvable by emitting a constant
+(loss $\to 0$, per-dimension std $0.04$, effective rank $2.4$ of $512$).
+Adding variance--covariance regularization on the context embedding removes the
+degenerate solution. With it, causal temporal prediction outperforms spatial masking
+by $+6.0$ mIoU on PASTIS crop segmentation under a frozen probe
+($22.3$ vs.\ $16.2$, paired $t$-test $p=0.041$, 3 seeds), and the margin widens from
+$+37\%$ at full supervision to $+100\%$ at $1\%$ labels. Probing frozen spatial features
+shows the objective makes the representation phenology-aware: acquisition month decodes at
+$61.3\%$ vs.\ $46.3\%$ (chance $8.3\%$).
+\end{abstract}
+
+% =====================================================================
+\section{Introduction}
+% BUDGET: ~0.6 page. Four paragraphs, no more.
+%
+% P1  Setup. EO = repeated observation of fixed locations. Crop type is defined by
+%     phenological trajectory, not single-date appearance. Spatial masking objectives
+%     (I-JEPA, SatMAE-style) discard the axis that carries the label.
+%
+% P2  The natural fix and why it isn't free. Causal future-latent prediction is the
+%     obvious objective. State the failure up front: it collapses, and the reason is a
+%     property of EO data specifically (short revisit + slow surface change =>
+%     high temporal redundancy => the pretext task is trivially solvable).
+%     THIS PARAGRAPH IS THE PAPER. Do not bury it.
+%
+% P3  What fixes it and what you get. One sentence on VICReg-style var-cov on the
+%     context embedding. Then the headline: +6.0 mIoU over spatial, gap widens under
+%     label scarcity, mechanism confirmed by month-decoding.
+%
+% P4  Contributions, three bullets max.
+
+\paragraph{Contributions.}
+\begin{itemize}
+  \item We identify and measure a failure mode specific to satellite image time series:
+        temporal redundancy makes latent future-prediction degenerate, and we
+        quantify the collapse via effective rank and per-dimension variance.
+  \item Under a matched-backbone, matched-budget protocol, causal temporal prediction
+        outperforms spatial masking and reconstruction/contrastive baselines on PASTIS,
+        with the advantage growing as labels shrink.
+  \item We give direct evidence for the mechanism: the temporal objective makes
+        \emph{single-frame} spatial features season-aware, which is the crop-discriminative signal.
+\end{itemize}
+
+% =====================================================================
+\section{Method}
+% BUDGET: ~0.5 page. Compress hard. Everyone at REO knows what JEPA is.
+% Do NOT include an architecture figure — it costs a quarter page and teaches nothing.
+%
+% Cover, in this order:
+%   - Causal split: context = frames 1..t, target = frame t+Delta. State the no-leakage
+%     property explicitly (one sentence). This is what distinguishes you from V-JEPA-style
+%     bidirectional masking and reviewers will look for it.
+%   - Frame tokenizer -> spatial ViT -> temporal transformer -> narrow predictor -> EMA target.
+%   - VICReg variance-covariance term on the context embedding, with lambda_v, lambda_c.
+%   - One equation for the loss. One. Not four.
+
+\paragraph{Setup.}
+Given $X \in \mathbb{R}^{T \times 10 \times 128 \times 128}$ with acquisition days
+$d \in [1,366]^{T}$, the encoder maps each frame to $N{=}256$ tokens of width $D{=}512$
+($P{=}8$ patches). A temporal transformer aggregates frames $1{:}t$ causally; a narrow
+predictor ($D_p{=}384$) maps the context to the EMA-target embedding of frame $t{+}\Delta$.
+Day-of-year enters only as a periodic encoding; chronological order is the acquisition index.
+
+% \begin{equation}
+%   \mathcal{L} = \underbrace{\| g_\theta(h_{1:t}) - \mathrm{sg}[f_\xi(x_{t+\Delta})] \|_2^2}_{\text{prediction}}
+%   + \lambda_v \mathcal{L}_{\text{var}} + \lambda_c \mathcal{L}_{\text{cov}}
+% \end{equation}
+
+% =====================================================================
+\section{Temporal redundancy induces collapse}
+% BUDGET: ~0.5 page + Figure 1. THIS IS THE HOOK. Give it real space.
+%
+% Argument:
+%   - Sentinel-2 revisit is ~5 days; land surface changes on a phenological timescale.
+%     So z_{t+1} ~= z_t for most (parcel, t). The predictor's optimal solution under an
+%     unregularized latent loss is the identity, and the encoder's is a constant.
+%   - Measured, lambda_v = lambda_c = 0: loss -> 0, per-dim std 0.04, effective rank 2.4/512.
+%   - With var-cov on: std holds ~1.0, effective rank ~430/512 (train), ~250 (eval-pool).
+%   - Why this matters to the EO community: it plausibly explains why latent-prediction
+%     objectives have not been reported to work on SITS. State this as a hypothesis, not fact.
+%
+% FIGURE 1: effective rank vs training step, VICReg on/off. This is the money figure.
+%   Make it legible at single-column width. Log-y if needed.
+
+\begin{figure}[t]
+  \centering
+  % \includegraphics[width=0.7\linewidth]{fig1_effective_rank.pdf}
+  \caption{Effective rank of the context embedding over pretraining on PASTIS.
+  Without variance--covariance regularization the representation collapses to
+  rank $\approx 2.4$ of $512$ while the prediction loss goes to zero --- the degenerate
+  solution admitted by near-identical consecutive acquisitions.}
+  \label{fig:collapse}
+\end{figure}
+
+% =====================================================================
+\section{Experiments}
+% BUDGET: ~0.3 page of prose. Protocol only. Results go in tables.
+%
+% MUST state, or a reviewer will assume the worst:
+%   - PASTIS (Garnot & Landrieu 2021): 2,433 patches, 10 bands, 38-61 irregular
+%     acquisitions, 20 classes. Official 5-fold: train {1,2,3}, val {4}, test {5}.
+%   - ALL methods share the SAME backbone and effective batch 192, 100 epochs.
+%     Say this in bold. It is your strongest defensive fact.
+%   - Frozen encoder. 1x1 conv linear probe + light 2-layer conv head ("conv mIoU").
+%   - 3 seeds, paired t-test. Say n=3 openly. Do not hide it.
+%
+% CRITICAL FRAMING SENTENCE — put something like this in, verbatim in spirit:
+%   "All numbers are frozen-probe results under a matched protocol and are not
+%    comparable to end-to-end supervised PASTIS models (U-TAE: 63.1 mIoU); the
+%    comparison of interest is between objectives, not against the supervised ceiling."
+%   Without this the reviewer reads 22.3 as a weak PASTIS result and rejects.
+
+% ---------------------------------------------------------------------
+% TABLE 1 — MAIN RESULT. Floors go at the TOP so the reader reads upward from them.
+% ---------------------------------------------------------------------
+\begin{table}[t]
+  \caption{PASTIS crop segmentation, frozen encoder, validation fold.
+  Mean $\pm$ std over 3 seeds; paired $t$-test against temporal $\Delta{=}1$.
+  All methods use an identical backbone and effective batch 192 for 100 epochs.}
+  \label{tab:main}
+  \centering
+  \begin{tabular}{lccc}
+    \toprule
+    Objective & conv mIoU & $p$ vs.\ temporal & parcel $k$-NN \\
+    \midrule
+    Raw spectral features      & FLOOR-TBD & FLOOR-TBD & FLOOR-TBD \\
+    Random-init encoder        & FLOOR-TBD & FLOOR-TBD & FLOOR-TBD \\
+    \midrule
+    MAE                        & TBD       & 0.001--0.009 & 54.4 \\
+    SimCLR                     & TBD       & 0.001--0.009 & 54.6 \\
+    BYOL                       & TBD       & 0.001--0.009 & 62.7 \\
+    Spatial JEPA               & 16.2      & 0.041 & 58.7 \\
+    Spatial JEPA (compute-matched, $3.5\times$ epochs) & $15.8 \pm 1.2$ & 0.036 & -- \\
+    \midrule
+    \textbf{Temporal JEPA ($\Delta{=}1$)} & $\mathbf{22.3 \pm 1.8}$ & --- & \textbf{65.5} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ---------------------------------------------------------------------
+% FIGURE 2 — label efficiency. The +37% -> +100% story. Strongest single visual.
+% ---------------------------------------------------------------------
+\begin{figure}[t]
+  \centering
+  % \includegraphics[width=0.7\linewidth]{fig2_label_efficiency.pdf}
+  \caption{Test-fold mIoU at $1/5/10/100\%$ label fractions.
+  Temporal: $9.2 / 13.1 / 15.9$; spatial: $4.6 / 6.9 / 9.5$.
+  The advantage grows from $+37\%$ at full supervision to $+100\%$ at $1\%$ labels.}
+  \label{fig:labeleff}
+\end{figure}
+
+% =====================================================================
+\section{Results}
+% BUDGET: ~0.5 page. Four short paragraphs, each one claim.
+%
+% (a) Main comparison. +6.0 over spatial, p=0.041. Reference floors from Table 1.
+% (b) The win is the objective, not compute. Compute-matched spatial at 3.5x epochs
+%     gets 15.8 +- 1.2 — no better. p=0.036.
+% (c) Horizon insensitivity. Delta = 1/2/4/8 -> 22.3/20.8/21.8/22.6, all overlapping,
+%     none differs from Delta=1 (p > 0.1), every horizon beats spatial. Frame as a
+%     robustness result: the effect is not a tuned-hyperparameter artifact.
+% (d) Label efficiency -> Figure 2.
+
+% =====================================================================
+\section{Why it wins: the representation becomes season-aware}
+% BUDGET: ~0.25 page + small inline table. No figure needed.
+%
+% Probe the frozen SPATIAL features (encode_full, no temporal positional encoding) to
+% decode acquisition time from a SINGLE frame. State explicitly that you probe the
+% spatial pathway, NOT the temporal one — the temporal pathway carries an explicit DOY
+% encoding and probing it would be circular. Reviewers WILL check this. Saying it
+% first is worth a paragraph of goodwill.
+%
+%   Temporal JEPA: 61.3% month accuracy, 30.4 d circular DOY MAE
+%   Spatial JEPA:  46.3% month accuracy, 41.8 d
+%   Chance:         8.3%
+%
+% Then the inference, hedged correctly: crop classes are separated by phenological stage,
+% which tracks season; so a season-aware representation is crop-discriminative.
+% This is evidence for the mechanism, not proof of it.
+
+% =====================================================================
+\section{Limitations}
+% BUDGET: ~0.2 page. DO NOT CUT THIS SECTION. It is cheap and it buys reviewer trust.
+% State plainly, no hedging language:
+%   - n = 3 seeds. Wilcoxon is uninformative at n=3 (minimum two-sided p = 0.25),
+%     so only the paired t-test is reported.
+%   - Single dataset. No second SITS benchmark yet.
+%   - Frozen probe only; no end-to-end fine-tuning comparison.  [DELETE IF YOU RUN IT]
+%   - No non-predictive temporal SSL baseline (e.g. frame-order pretext), so
+%     "prediction helps" is not fully separated from "using the time axis helps".
+%     [DELETE IF YOU RUN IT — and try to run it]
+%   - "Equal compute" means equal epochs; GPU-hours vary. The compute-matched
+%     spatial run is the robustness check.
+%   - SimCLR: gradient accumulation equalizes optimization batch but not NT-Xent
+%     negative count.
+
+% =====================================================================
+\section{Conclusion}
+% BUDGET: 3 sentences. Restate the failure mode, the fix, the transferable lesson:
+% objectives that assume the target is hard to predict need explicit anti-collapse
+% pressure on data with high temporal redundancy — which describes most EO time series.
+
+\bibliographystyle{plainnat}
+\bibliography{refs}
+
+\end{document}

@@ -1,0 +1,108 @@
+% =====================================================================
+% refs.bib  —  REO-2 submission
+%
+% !! VERIFY EVERY ENTRY BEFORE SUBMITTING !!
+% Under the NeurIPS 2026 LLM policy you personally own citation correctness.
+% A fabricated reference caught by this particular reviewer pool costs far more
+% than the citation is worth. Open each arXiv ID and confirm it resolves to the
+% paper named here. Entries marked VERIFY were in your README with 2026 arXiv IDs
+% that I could not independently confirm — check these first.
+% =====================================================================
+
+% ---- The dataset and the supervised ceiling. Landrieu organizes REO-2. Cite correctly.
+@inproceedings{garnot2021pastis,
+  title     = {Panoptic Segmentation of Satellite Image Time Series with Convolutional Temporal Attention Networks},
+  author    = {Garnot, Vivien Sainte Fare and Landrieu, Loic},
+  booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
+  year      = {2021}
+}
+
+% ---- The objective you port
+@inproceedings{assran2023ijepa,
+  title     = {Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture},
+  author    = {Assran, Mahmoud and Duval, Quentin and Misra, Ishan and Bojanowski, Piotr and Vincent, Pascal and Rabbat, Michael and LeCun, Yann and Ballas, Nicolas},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2023}
+}
+
+@article{bardes2024vjepa,
+  title   = {Revisiting Feature Prediction for Learning Visual Representations from Video},
+  author  = {Bardes, Adrien and Ponce, Jean and LeCun, Yann and others},
+  journal = {arXiv preprint arXiv:2404.08471},
+  year    = {2024},
+  note    = {VERIFY arXiv ID}
+}
+
+% ---- The anti-collapse mechanism. Central to your paper — get this one right.
+@inproceedings{bardes2022vicreg,
+  title     = {{VICReg}: Variance-Invariance-Covariance Regularization for Self-Supervised Learning},
+  author    = {Bardes, Adrien and Ponce, Jean and LeCun, Yann},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2022}
+}
+
+% ---- Baselines in Table 1
+@inproceedings{he2022mae,
+  title     = {Masked Autoencoders Are Scalable Vision Learners},
+  author    = {He, Kaiming and Chen, Xinlei and Xie, Saining and Li, Yanghao and Doll{\'a}r, Piotr and Girshick, Ross},
+  booktitle = {CVPR},
+  year      = {2022}
+}
+
+@inproceedings{chen2020simclr,
+  title     = {A Simple Framework for Contrastive Learning of Visual Representations},
+  author    = {Chen, Ting and Kornblith, Simon and Norouzi, Mohammad and Hinton, Geoffrey},
+  booktitle = {International Conference on Machine Learning (ICML)},
+  year      = {2020}
+}
+
+@inproceedings{grill2020byol,
+  title     = {Bootstrap Your Own Latent: A New Approach to Self-Supervised Learning},
+  author    = {Grill, Jean-Bastien and Strub, Florian and Altch{\'e}, Florent and others},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2020}
+}
+
+% ---- EO self-supervised context. REO reviewers expect to see themselves cited.
+% ADD 2-4 of: SatMAE, Scale-MAE, SSL4EO, Presto, GeoBench, MMEarth, Prithvi.
+% Pick the ones actually relevant to SITS, not just the famous ones.
+
+% ---- FLAGGED: could not confirm these two from your README. Verify or delete.
+@article{VERIFY_vjepa_2026,
+  title  = {[TITLE UNCONFIRMED]},
+  author = {[UNCONFIRMED]},
+  journal = {arXiv preprint arXiv:2601.14354},
+  year   = {2026},
+  note   = {VERIFY OR DELETE — appeared in README bibliography, unconfirmed}
+}
+
+@article{VERIFY_varjepa_2026,
+  title  = {[TITLE UNCONFIRMED]},
+  author = {[UNCONFIRMED]},
+  journal = {arXiv preprint arXiv:2603.20111},
+  year   = {2026},
+  note   = {VERIFY OR DELETE — appeared in README bibliography, unconfirmed}
+}
+
+% =====================================================================
+% EVIDENCE THAT THE TWO 2026 IDs ABOVE ARE FABRICATED — read before citing.
+%
+% README.md IX.9 lists, in the SAME bibliography:
+%     "Bardes et al., V-JEPA, 2024 (2404.08471)"     <- the real V-JEPA
+%     "VJEPA (arXiv 2601.14354)"                     <- asserted as a SECOND paper
+% One entry names a paper that exists; the other claims a different paper with
+% the same name and a different ID. That is the signature of a hallucinated
+% citation, not of two genuine works.
+%
+% Neither 2601.14354 nor 2603.20111 appears anywhere else in the repo: no title,
+% no author list, no venue, no URL. Both are bare numbers (README.md:416 only).
+%
+% They are also the two IDs a reviewer is most likely to check, precisely because
+% they are the two the reader cannot place.
+%
+% DELETE BOTH unless each resolves AND returns the claimed title. The current
+% paper framing (temporal redundancy -> collapse -> var-cov fix) does not use
+% distributional JEPA at all, so nothing in the argument depends on them.
+%   for id in 2601.14354 2603.20111; do
+%     curl -sI "https://arxiv.org/abs/$id" | head -1; done
+% =====================================================================

@@ -1,0 +1,177 @@
+% =====================================================================
+% REO @ NeurIPS 2026 — 4 pages, references and appendix excluded.
+% Portal: CMT3  cmt3.research.microsoft.com/REO2026   (NOT OpenReview)
+%
+% RULE FOR THIS FILE: every number is either (a) traceable to a committed
+% CSV, or (b) wrapped in \PENDING{} naming the run that produces it.
+% Nothing in between. See ../STATUS.md for what is currently traceable.
+% =====================================================================
+\documentclass{article}
+
+\workshoptitle{2nd Workshop on Advances in Representation Learning for Earth Observation}
+\usepackage[dblblindworkshop]{neurips_2026}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{xcolor}
+
+% Strip author metadata out of the PDF — LaTeX leaks \author into PDF
+% properties and that is a genuine desk-reject cause under double-blind.
+\hypersetup{pdfauthor={},pdftitle={},pdfsubject={},pdfkeywords={},pdfcreator={},pdfproducer={}}
+
+% Placeholder macro. Every occurrence must be gone before submission.
+% \listPENDING at the end of the doc prints the outstanding ones.
+\newcommand{\PENDING}[1]{\textcolor{red}{\textbf{[PENDING: #1]}}}
+
+\title{Temporal Prediction as a Pretext Task for Satellite Image Time Series}
+
+% DOUBLE-BLIND: no \author block, no affiliation, no acknowledgements,
+% no github.com/<username>. Anonymous code link only, or none at all.
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Self-supervised pretraining on satellite image time series is usually framed spatially: mask and
+reconstruct, or contrast augmented views of a single acquisition. We ask whether predicting the
+\emph{future latent} of a series is a better pretext task on PASTIS, and find that it is, under a
+frozen-probe protocol matched across methods. We report the comparison against both a random-init and
+a raw-feature floor, quantify the advantage as a function of label budget, and give evidence for the
+mechanism: the temporal objective makes the \emph{spatial} representation season-aware. We are
+explicit about what the experiment does and does not establish.
+\end{abstract}
+
+% ---------------------------------------------------------------------
+\section{Introduction}
+% ~0.5 page. Land three things and stop.
+%  1. SITS is temporal; dominant SSL pretexts are not.
+%  2. Predict-the-future-latent (JEPA-style, EMA target, stop-grad, narrow
+%     predictor) is the natural temporal pretext, and needs anti-collapse
+%     on SITS because consecutive acquisitions are near-identical.
+%  3. Contributions, three bullets, no more.
+
+\paragraph{Contributions.}
+\begin{itemize}\itemsep0pt
+  \item A temporal-JEPA pretext for SITS with a variance--covariance term that is \emph{necessary},
+        not decorative: without it the objective collapses because the future frame is nearly the
+        present one (Fig.~\ref{fig:erank}).
+  \item A frozen-probe comparison on PASTIS against spatial JEPA, MAE, BYOL and SimCLR
+        \emph{and against a random-init and a raw-feature floor} (Table~\ref{tab:main}).
+  \item Evidence on where the advantage comes from: it grows as labels shrink
+        (Fig.~\ref{fig:labeleff}), and the temporal objective makes the spatial features decode
+        acquisition month far better than the spatial objective does.
+\end{itemize}
+
+% ---------------------------------------------------------------------
+\section{Method}
+% ~0.5 page. Factorized spatial ViT + temporal transformer; context =
+% past acquisitions, target = latent of the frame Delta ahead under an EMA
+% encoder with stop-grad; predictor narrower than the encoder (384 < 512).
+% State the anti-collapse term explicitly with its coefficients.
+
+Anti-collapse is the part that is specific to SITS. Standard JEPA (EMA target, stop-gradient, narrow
+predictor) collapses here: consecutive acquisitions of a parcel are nearly identical, so
+``predict the future latent'' is solved by emitting a constant. We add a VICReg-style
+variance--covariance penalty on the trainable context embedding
+($\lambda_v = 1.0$, $\lambda_c = 0.04$); setting both to zero recovers pure I-JEPA and reproduces the
+collapse.
+
+% ---------------------------------------------------------------------
+\section{Experimental setup}
+% ~0.4 page. PASTIS, official folds. State the protocol in one paragraph
+% and be precise -- V4 (comparison hygiene) is the thing reviewers check.
+
+PASTIS \citep{garnot2021pastis}, official 5-fold split, 10 Sentinel-2 bands, $128\times128$ patches,
+day-of-year positional encoding. All methods share the encoder architecture, the effective batch
+(192), the optimizer, and the probe budget (15 epochs, both a linear and a convolutional head).
+Encoders are frozen; only the head is trained. \textbf{All comparisons are on the same evaluation
+split} --- \PENDING{state val or test and keep every row on it; the project previously probed one
+architecture on test while every baseline was on val, producing a $-1.8$ mIoU artifact}.
+
+\paragraph{Floors.} Two cells anchor the table. \texttt{random} is the identical architecture with
+weights never updated, which isolates the objective from the inductive bias of temporal attention.
+\texttt{raw\_features} is patch-mean raw bands with no encoder, the true no-representation floor.
+\PENDING{P0 --- both cells}
+
+% ---------------------------------------------------------------------
+\section{Results}
+
+\begin{table}[t]
+\centering
+\caption{PASTIS crop segmentation, frozen probe, conv head. \emph{Every row states its own $n$.}}
+\label{tab:main}
+\begin{tabular}{lccc}
+\toprule
+Method & conv mIoU & $n$ & $\Delta$ vs temporal \\
+\midrule
+Temporal JEPA ($\Delta{=}1$) & \PENDING{P1} & 5 & --- \\
+Spatial JEPA                 & \PENDING{P1} & 5 & \PENDING{P1} \\
+Temporal-order pretext       & \PENDING{P2} & 1 & \PENDING{P2} \\
+MAE                          & 3.8  & 1 & \PENDING{P1} \\
+BYOL                         & 5.0  & 1 & \PENDING{P1} \\
+SimCLR                       & 8.3  & 1 & \PENDING{P1} \\
+\midrule
+\emph{random init} (floor)   & \PENDING{P0} & 5 & \\
+\emph{raw features} (floor)  & \PENDING{P0} & 5 & \\
+\bottomrule
+\end{tabular}
+\end{table}
+% Seed-0 conv mIoU currently in runs/matrix_results.csv:
+%   tjepa_h1 22.06 | spatial_jepa 16.19 | mae 3.78 | byol 4.99 | simclr 8.29
+% MAE/BYOL/SimCLR above are that single seed and are labelled n=1 on purpose.
+% The temporal and spatial rows are deliberately left PENDING rather than
+% filled from seed 0 -- they carry the claim and must come from P1.
+
+\begin{figure}[t]
+\centering
+% \includegraphics[width=0.48\textwidth]{figures/fig1_effective_rank.pdf}
+\caption{\textbf{The hook.} Effective rank of the context embedding during pretraining, with and
+without the variance--covariance term. \PENDING{P0 addendum --- the VICReg-off run does not exist for
+PASTIS; \texttt{tjepa\_noreg} was skipped in every committed pass}}
+\label{fig:erank}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+% \includegraphics[width=0.48\textwidth]{figures/fig2_label_efficiency.pdf}
+\caption{Label efficiency at 1/5/10/100\% of labels, temporal vs spatial.
+\PENDING{regenerate --- the few-shot numbers were never written to a CSV}}
+\label{fig:labeleff}
+\end{figure}
+
+\paragraph{The advantage is the objective, not compute.} Spatial JEPA trained $3.5\times$ longer to
+match wall-clock reaches \PENDING{P1; seed-0 value 15.6}, no better than standard spatial JEPA.
+
+\paragraph{Mechanism, inline.} Probing the \emph{frozen spatial} features (not the temporal pathway,
+which would be circular given DOY encoding) to decode acquisition time from a single frame: 12-way
+month classification, chance $8.3\%$. \PENDING{regenerate via scripts/mechanistic.py --- previously
+61.3\% vs 46.3\%, stdout-only, no committed artifact} Since crops separate by phenological stage,
+this is direct evidence that the future-prediction objective made the \emph{spatial} representation
+season-aware.
+
+% ---------------------------------------------------------------------
+\section{Limitations}
+% Keep this. One tight paragraph. Do NOT sell it as a contribution --
+% it is here so the paper reads as visibly rigorous. Name, in order:
+% the floors, n, the val-vs-test protocol, the SimCLR negative-count
+% caveat, and the missing temporal-SSL baseline if P2 does not land.
+
+Our comparison is frozen-probe only; we do not evaluate fine-tuning, and supervised U-TAE
+($63.1$ mIoU) is a ceiling rather than a peer. Multi-seed results cover
+\PENDING{list exactly which cells} at $n{=}5$; MAE, BYOL and SimCLR are single-seed and are marked as
+such in Table~\ref{tab:main}. All cells are probed on \PENDING{val/test} with an identical budget.
+Our SimCLR baseline uses the negative count afforded by the per-step batch, which is smaller than the
+regime contrastive methods are usually tuned for, so it should be read as a same-budget baseline
+rather than a tuned one. \PENDING{if P2 does not land: ``We do not compare against a non-predictive
+temporal pretext, so we cannot separate the benefit of predicting future latents from the benefit of
+using the temporal axis at all.''}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

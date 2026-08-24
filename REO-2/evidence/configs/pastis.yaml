@@ -1,0 +1,25 @@
+# PASTIS dataset config.  Zenodo DOI 10.5281/zenodo.5012942
+# NOTE: confirm band ORDER against the official dataloader before trusting these indices.
+name: pastis
+root: ./data_root/PASTIS          # set after scripts/download_pastis.sh
+bands: 10                          # B2,B3,B4,B5,B6,B7,B8,B8A,B11,B12 (resampled to 10 m) — VERIFY ordering
+patch_size_px: 128
+num_classes: 20                    # PASTIS labels: 0=background, 1..18 crops, 19=void (20 values)
+ignore_index: 19                   # void — excluded from loss + mIoU (background 0 is kept, U-TAE style)
+folds: [1, 2, 3, 4, 5]             # official 5-fold CV
+train_folds: [1, 2, 3]
+val_folds: [4]
+test_folds: [5]
+
+# temporal handling
+max_seq_len: 32                    # frames/series. At patch_size 8 (256 tokens/frame) full 61 is
+                                   # too heavy; 32 keeps horizon Δ≤8 valid and ~halves compute.
+                                   # Raise toward 48/61 only if you also drop patch_size or batch.
+date_encoding: doy                 # day-of-year (irregular cadence!) — NOT integer index
+
+# normalization: per-band mean/std — TODO compute from train folds (see data/transforms.py)
+norm_mean: null
+norm_std: null
+
+# few-shot label fractions for eval
+fewshot_fractions: [0.01, 0.05, 0.10]
