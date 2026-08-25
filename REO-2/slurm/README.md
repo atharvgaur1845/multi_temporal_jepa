@@ -107,7 +107,8 @@ Put the dataset and all `runs/` output on **scratch**, not home. Scratch is ofte
 ssh <you>@<cluster>
 git clone <your repo>  &&  cd multi_temporal_jepa       # or rsync it up
 bash REO-2/slurm/00_env_setup.sh                        # builds the venv, ~5 min
-bash REO-2/slurm/01_stage_pastis.sh /scratch/$USER      # 29 GB download, 1-3 h. tmux this.
+bash REO-2/slurm/02_pick_storage.sh                     # quota check -> where to put the data
+bash REO-2/slurm/01_stage_pastis.sh $SCR                # 29 GB download, 1-3 h. tmux this.
 
 # --- then submit, in this order ---
 sbatch REO-2/slurm/10_fit_batch.sbatch                  # 10 min: find the batch size for an A100
