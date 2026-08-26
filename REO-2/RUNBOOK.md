@@ -99,10 +99,41 @@ bash REO-2/slurm/01_stage_pastis.sh $SCR
 # detach: Ctrl-b then d      reattach: tmux attach -t pastis
 ```
 
-When it finishes:
+When it finishes, verify the structure — not just that the folder exists:
 
 ```bash
-ls $SCR/data_root/PASTIS/metadata.geojson && du -sh $SCR/data_root/PASTIS
+ls $SCR/data_root/PASTIS/metadata.geojson
+du -sh $SCR/data_root/PASTIS
+ls $SCR/data_root/PASTIS/DATA_S2    | wc -l     # expect ~2433 S2_*.npy
+ls $SCR/data_root/PASTIS/ANNOTATIONS | wc -l    # expect ~2433 TARGET_*.npy
+```
+
+### If unzip refuses with "possible zip bomb"
+
+```
+error: invalid zip file with overlapped components (possible zip bomb)
+```
+
+This is a **false positive**. Info-ZIP 6.0 ships a zip-bomb heuristic (the CVE-2019-13232
+mitigation) that misreads large **zip64** archives, and a 28.76 GB zip is necessarily zip64.
+Overriding it is safe here *only because* `download_pastis.sh` already verified the md5 against the
+published checksum `cfc441bf18137ff0bbf4fad58828fb98` — integrity is established independently of
+the heuristic. Never override it on a file whose checksum has not passed.
+
+`01_stage_pastis.sh` now sets `UNZIP_DISABLE_ZIPBOMB_DETECTION=TRUE` and falls back to
+`bsdtar` / `7z` / python `zipfile`. To finish an already-downloaded zip by hand:
+
+```bash
+cd $SCR/data_root
+UNZIP_DISABLE_ZIPBOMB_DETECTION=TRUE unzip -q -o PASTIS.zip -d $SCR/data_root
+# or, if that still refuses:
+bsdtar -xf PASTIS.zip
+```
+
+Then delete the 29 GB zip — but only once the verification block above passes:
+
+```bash
+rm -f $SCR/data_root/PASTIS.zip
 ```
 
 ## 4 · Point the scripts at it
@@ -249,6 +280,8 @@ cat REO-2/slurm/logs/<name>-<jobid>.err
 | symptom | cause | fix |
 |---|---|---|
 | `FATAL: PASTIS not found` | step 3 incomplete or `SCRATCH_ROOT` wrong | check `$SCR/data_root/PASTIS/metadata.geojson` |
+| `possible zip bomb` on extract | false positive on zip64; md5 already passed | `UNZIP_DISABLE_ZIPBOMB_DETECTION=TRUE`, or `bsdtar -xf` |
+| `ls: cannot access '/data_root/...'` | `$SCR` unset in this shell | `export SCR=/scratch/$USER` |
 | `FATAL: BATCH * ACCUM != 192` | step 6 half-done | the guard is intentional; fix `_common.sh` |
 | `CUDA out of memory` | batch too big for the card you got | lower `BATCH`, raise `ACCUM`, keep the product at 192 |
 | job vanishes at the wall-clock | `--time` too short | raise `#SBATCH --time`, resubmit; `--resume` skips finished cells |
