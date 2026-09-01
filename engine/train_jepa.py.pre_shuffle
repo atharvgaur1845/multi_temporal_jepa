@@ -1,0 +1,173 @@
+"""Pretraining loop for JEPA (spatial or temporal).
+
+Orchestrates the pieces from models/, masking/, objectives/, engine/. The key ordering detail:
+the EMA step happens AFTER the optimizer step, using the just-updated student. Diagnostics are
+logged on a schedule and ALWAYS paired with the loss (a falling loss alone can be collapse).
+
+Run:
+    python -m engine.train_jepa --config configs/model/tjepa.yaml --data configs/data/pastis.yaml
+"""
+from __future__ import annotations
+
+import argparse
+import math
+import os
+
+import torch
+from torch.utils.data import DataLoader
+
+from data.pastis_dataset import PASTIS, collate_variable_length
+from data.transforms import compute_band_stats
+from engine.diagnostics import collapse_metrics
+from engine.ema import ema_update, momentum_schedule
+from models.jepa import build_model
+from objectives.jepa_loss import jepa_latent_loss, variance_covariance_reg
+from utils.checkpoint import save_checkpoint
+from utils.config import load_yaml
+from utils.device import resolve_device
+from utils.gpu_hours import GpuHourMeter
+from utils.seed import seed_everything
+
+
+def _to_device(batch, device):
+    out = {}
+    for k, v in batch.items():
+        out[k] = v.to(device) if torch.is_tensor(v) else v
+    return out
+
+
+def _lr_at(step, total_steps, warmup_steps, base_lr, min_lr):
+    """Linear warmup then cosine decay to min_lr."""
+    if step < warmup_steps:
+        return base_lr * step / max(1, warmup_steps)
+    progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+    return min_lr + 0.5 * (base_lr - min_lr) * (1 + math.cos(math.pi * progress))
+
+
+def _wd_at(step, total_steps, wd_start, wd_end):
+    """Cosine ramp of weight decay wd_start -> wd_end (I-JEPA ramps 0.04 -> 0.40)."""
+    progress = min(1.0, max(0.0, step / max(1, total_steps)))
+    return wd_end + 0.5 * (wd_start - wd_end) * (1 + math.cos(math.pi * progress))
+
+
+def _augment_flips(batch):
+    """Cheap label-free pretraining augmentation: random H/V flips applied to the whole series.
+    Pretraining has no labels, so flipping (B,T,C,H,W) is safe and doubles effective data."""
+    data = batch["data"]
+    if torch.rand(1).item() < 0.5:
+        data = torch.flip(data, dims=[-1])
+    if torch.rand(1).item() < 0.5:
+        data = torch.flip(data, dims=[-2])
+    batch = dict(batch)
+    batch["data"] = data
+    return batch
+
+
+def train_one_epoch(model, loader, optimizer, scaler, cfg, step0, total_steps, device,
+                    logger=print):
+    """Run one epoch. Returns the updated global step."""
+    model.train()
+    optim_cfg = cfg["optim"]
+    loss_cfg = cfg["loss"]
+    ema_cfg = cfg["ema"]
+    log_cfg = cfg["log"]
+    grad_accum = optim_cfg.get("grad_accum", 1)
+    warmup_steps = optim_cfg.get("warmup_epochs", 0) * len(loader)
+    base_lr, min_lr = optim_cfg["lr"], optim_cfg.get("min_lr", 0.0)
+    wd_start = optim_cfg.get("weight_decay_start", 0.04)
+    wd_end = optim_cfg.get("weight_decay_end", wd_start)
+    augment = optim_cfg.get("augment", True)
+
+    step = step0
+    optimizer.zero_grad(set_to_none=True)
+    for it, batch in enumerate(loader):
+        batch = _to_device(batch, device)
+        if augment:
+            batch = _augment_flips(batch)
+
+        lr = _lr_at(step, total_steps, warmup_steps, base_lr, min_lr)
+        wd = _wd_at(step, total_steps, wd_start, wd_end)
+        for g in optimizer.param_groups:
+            g["lr"] = lr
+            g["weight_decay"] = wd
+
+        with torch.autocast(device_type=device.type, enabled=optim_cfg.get("amp", True)):
+            pred, target, ctx = model(batch)
+            loss = jepa_latent_loss(pred, target, norm_target=loss_cfg.get("target_layernorm", True),
+                                    loss_type=loss_cfg.get("type", "l2"))
+            # VICReg-style anti-collapse on the trainable context embedding (essential for
+            # temporal SITS JEPA, where future ≈ present makes collapse easy). Set coeffs to 0
+            # in the config to recover pure I-JEPA.
+            var_c = loss_cfg.get("var_coeff", 1.0)
+            cov_c = loss_cfg.get("cov_coeff", 0.04)
+            if var_c or cov_c:
+                std_l, cov_l = variance_covariance_reg(ctx.float())
+                loss = loss + var_c * std_l + cov_c * cov_l
+        scaler.scale(loss / grad_accum).backward()
+
+        if (it + 1) % grad_accum == 0:
+            scaler.step(optimizer)
+            scaler.update()
+            optimizer.zero_grad(set_to_none=True)
+            # EMA AFTER the optimizer step, using the updated student.
+            m = momentum_schedule(step, total_steps, ema_cfg["base_momentum"], ema_cfg["final_momentum"])
+            ema_update(model.context_encoder, model.target_encoder, m)
+
+        if step % log_cfg.get("diagnostics_every", 50) == 0:
+            # measure collapse on the TRAINABLE context embedding (not the EMA-smoothed target,
+            # which lags and can mask an in-progress collapse).
+            diag = collapse_metrics(ctx, pred=pred, target=target)
+            logger(f"step {step} loss {loss.item():.4f} lr {lr:.2e} wd {wd:.3f} "
+                   f"std {diag['per_dim_std']:.3f} effrank {diag['effective_rank']:.1f} "
+                   f"varratio {diag.get('variance_ratio', float('nan')):.3f}")
+        step += 1
+    return step
+
+
+def main(config_path, data_config_path, device=None):
+    cfg = load_yaml(config_path)
+    data_cfg = load_yaml(data_config_path)
+    seed_everything(cfg["log"].get("seed", 0))
+    device = resolve_device(device or cfg.get("device"))
+    print(f"[train_jepa] device = {device}")
+
+    # data (cap frames per series to bound memory; random subsample as augmentation)
+    train = PASTIS(data_cfg["root"], folds=data_cfg["train_folds"], return_label=False,
+                   max_seq_len=data_cfg.get("max_seq_len"), subsample_train=True)
+    if data_cfg.get("norm_mean") is None:
+        mean, std = compute_band_stats(train, max_samples=200)
+        train.norm_mean, train.norm_std = mean, std
+    loader = DataLoader(train, batch_size=cfg["optim"]["batch_size"], shuffle=True,
+                        num_workers=int(os.environ.get("TJEPA_WORKERS", "8")),
+                        collate_fn=collate_variable_length, drop_last=True,
+                        pin_memory=True)
+
+    # model + optim
+    model = build_model(cfg).to(device)
+    params = [p for p in model.parameters() if p.requires_grad]
+    optimizer = torch.optim.AdamW(params, lr=cfg["optim"]["lr"],
+                                  weight_decay=cfg["optim"].get("weight_decay_start", 0.04))
+    scaler = torch.amp.GradScaler(device.type, enabled=cfg["optim"].get("amp", True))
+
+    epochs = cfg["optim"]["epochs"]
+    total_steps = epochs * len(loader)
+    out_dir = cfg.get("out_dir", "runs/tjepa")
+    os.makedirs(out_dir, exist_ok=True)
+
+    meter = GpuHourMeter(device); meter.start()
+    step = 0
+    for ep in range(epochs):
+        step = train_one_epoch(model, loader, optimizer, scaler, cfg, step, total_steps, device)
+        save_checkpoint(os.path.join(out_dir, "last.ckpt"), model, optimizer, scaler, None,
+                        step, {"model": cfg, "data": data_cfg})
+    stats = meter.stop()
+    print(f"done: {stats}")
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--config", default="configs/model/tjepa.yaml")
+    ap.add_argument("--data", default="configs/data/pastis.yaml")
+    ap.add_argument("--device", default=None, help="override config device, e.g. cuda:1")
+    args = ap.parse_args()
+    main(args.config, args.data, device=args.device)

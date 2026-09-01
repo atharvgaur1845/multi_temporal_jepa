@@ -1,0 +1,13 @@
+cell,objective,seed,head,receptive_field,miou,probe_epochs
+raw_features,raw,0,rf1,1,0.0475,15
+raw_features,raw,0,rf3,3,0.1452,15
+raw_features,raw,0,rf5,5,0.2025,15
+raw_features,raw,0,rf9,9,0.2158,15
+raw_features,raw,1,rf1,1,0.0469,15
+raw_features,raw,1,rf3,3,0.1373,15
+raw_features,raw,1,rf5,5,0.2029,15
+raw_features,raw,1,rf9,9,0.1958,15
+raw_features,raw,2,rf1,1,0.047,15
+raw_features,raw,2,rf3,3,0.1382,15
+raw_features,raw,2,rf5,5,0.2048,15
+raw_features,raw,2,rf9,9,0.2063,15
