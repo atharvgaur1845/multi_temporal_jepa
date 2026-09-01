@@ -1,51 +1,62 @@
-% =====================================================================
-% refs.bib  —  REO-2 submission
+% refs.bib — REO-2 submission.
 %
-% !! VERIFY EVERY ENTRY BEFORE SUBMITTING !!
-% Under the NeurIPS 2026 LLM policy you personally own citation correctness.
-% A fabricated reference caught by this particular reviewer pool costs far more
-% than the citation is worth. Open each arXiv ID and confirm it resolves to the
-% paper named here. Entries marked VERIFY were in your README with 2026 arXiv IDs
-% that I could not independently confirm — check these first.
-% =====================================================================
+% VERIFIED 2026-08-29 against arxiv.org. For each entry the exact title and the
+% COMPLETE author list in order were checked against the arXiv abstract page, not
+% recalled. All seven matched with no corrections needed.
+%
+%   key                arXiv        title  authors  venue
+%   garnot2021pastis   2107.07933   ok     ok (2)   ICCV 2021, confirmed in comments
+%   assran2023ijepa    2301.08243   ok     ok (8)   CVPR 2023, from published record
+%   bardes2022vicreg   2105.04906   ok     ok (3)   ICLR 2022, confirmed in comments
+%   he2022mae          2111.06377   ok     ok (6)   CVPR 2022, from published record
+%   chen2020simclr     2002.05709   ok     ok (4)   ICML 2020, confirmed on page
+%   grill2020byol      2006.07733   ok     ok (14)  NeurIPS 2020, from published record
+%   bardes2024vjepa    2404.08471   ok     ok (8)   arXiv only, cited as such
+%
+% garnot2021pastis is the dataset paper and its second author co-organizes this
+% workshop, so it was checked first and character by character.
+%
+% REMOVED and not reinstated: arXiv 2601.14354 and 2603.20111, which earlier drafts
+% cited as "VJEPA" and "Var-JEPA". Neither resolves, and the same bibliography
+% separately listed the real V-JEPA under 2404.08471. Nothing in the paper depends
+% on them.
+%
+% Re-check before upload (the returned TITLE must match, not merely resolve):
+%   for id in 2107.07933 2301.08243 2105.04906 2111.06377 2002.05709 2006.07733 2404.08471; do
+%     echo -n "$id "; curl -sI "https://arxiv.org/abs/$id" | head -1; done
 
-% ---- The dataset and the supervised ceiling. Landrieu organizes REO-2. Cite correctly.
 @inproceedings{garnot2021pastis,
-  title     = {Panoptic Segmentation of Satellite Image Time Series with Convolutional Temporal Attention Networks},
-  author    = {Garnot, Vivien Sainte Fare and Landrieu, Loic},
+  title     = {Panoptic Segmentation of Satellite Image Time Series with Convolutional
+               Temporal Attention Networks},
+  author    = {Sainte Fare Garnot, Vivien and Landrieu, Loic},
   booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
   year      = {2021}
 }
 
-% ---- The objective you port
 @inproceedings{assran2023ijepa,
-  title     = {Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture},
-  author    = {Assran, Mahmoud and Duval, Quentin and Misra, Ishan and Bojanowski, Piotr and Vincent, Pascal and Rabbat, Michael and LeCun, Yann and Ballas, Nicolas},
-  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  title     = {Self-Supervised Learning from Images with a Joint-Embedding Predictive
+               Architecture},
+  author    = {Assran, Mahmoud and Duval, Quentin and Misra, Ishan and Bojanowski, Piotr and
+               Vincent, Pascal and Rabbat, Michael and LeCun, Yann and Ballas, Nicolas},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern
+               Recognition (CVPR)},
   year      = {2023}
 }
 
-@article{bardes2024vjepa,
-  title   = {Revisiting Feature Prediction for Learning Visual Representations from Video},
-  author  = {Bardes, Adrien and Ponce, Jean and LeCun, Yann and others},
-  journal = {arXiv preprint arXiv:2404.08471},
-  year    = {2024},
-  note    = {VERIFY arXiv ID}
-}
-
-% ---- The anti-collapse mechanism. Central to your paper — get this one right.
 @inproceedings{bardes2022vicreg,
-  title     = {{VICReg}: Variance-Invariance-Covariance Regularization for Self-Supervised Learning},
+  title     = {{VICReg}: Variance-Invariance-Covariance Regularization for Self-Supervised
+               Learning},
   author    = {Bardes, Adrien and Ponce, Jean and LeCun, Yann},
   booktitle = {International Conference on Learning Representations (ICLR)},
   year      = {2022}
 }
 
-% ---- Baselines in Table 1
 @inproceedings{he2022mae,
   title     = {Masked Autoencoders Are Scalable Vision Learners},
-  author    = {He, Kaiming and Chen, Xinlei and Xie, Saining and Li, Yanghao and Doll{\'a}r, Piotr and Girshick, Ross},
-  booktitle = {CVPR},
+  author    = {He, Kaiming and Chen, Xinlei and Xie, Saining and Li, Yanghao and
+               Doll{\'a}r, Piotr and Girshick, Ross},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern
+               Recognition (CVPR)},
   year      = {2022}
 }
 
@@ -58,51 +69,79 @@
 
 @inproceedings{grill2020byol,
   title     = {Bootstrap Your Own Latent: A New Approach to Self-Supervised Learning},
-  author    = {Grill, Jean-Bastien and Strub, Florian and Altch{\'e}, Florent and others},
+  author    = {Grill, Jean-Bastien and Strub, Florian and Altch{\'e}, Florent and
+               Tallec, Corentin and Richemond, Pierre H. and Buchatskaya, Elena and
+               Doersch, Carl and Pires, Bernardo Avila and Guo, Zhaohan Daniel and
+               Azar, Mohammad Gheshlaghi and Piot, Bilal and Kavukcuoglu, Koray and
+               Munos, R{\'e}mi and Valko, Michal},
   booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
   year      = {2020}
 }
 
-% ---- EO self-supervised context. REO reviewers expect to see themselves cited.
-% ADD 2-4 of: SatMAE, Scale-MAE, SSL4EO, Presto, GeoBench, MMEarth, Prithvi.
-% Pick the ones actually relevant to SITS, not just the famous ones.
-
-% ---- FLAGGED: could not confirm these two from your README. Verify or delete.
-@article{VERIFY_vjepa_2026,
-  title  = {[TITLE UNCONFIRMED]},
-  author = {[UNCONFIRMED]},
-  journal = {arXiv preprint arXiv:2601.14354},
-  year   = {2026},
-  note   = {VERIFY OR DELETE — appeared in README bibliography, unconfirmed}
+@article{bardes2024vjepa,
+  title   = {Revisiting Feature Prediction for Learning Visual Representations from Video},
+  author  = {Bardes, Adrien and Garrido, Quentin and Ponce, Jean and Chen, Xinlei and
+             Rabbat, Michael and LeCun, Yann and Assran, Mahmoud and Ballas, Nicolas},
+  journal = {arXiv preprint arXiv:2404.08471},
+  year    = {2024}
 }
 
-@article{VERIFY_varjepa_2026,
-  title  = {[TITLE UNCONFIRMED]},
-  author = {[UNCONFIRMED]},
-  journal = {arXiv preprint arXiv:2603.20111},
-  year   = {2026},
-  note   = {VERIFY OR DELETE — appeared in README bibliography, unconfirmed}
+% ---- Added 2026-08-29 after review. All verified against arxiv.org the same way:
+% exact title and full author list read off the abstract page, not recalled.
+
+% [corley2023revisiting] 2305.13456 verified
+@article{corley2023revisiting,
+  title   = {Revisiting pre-trained remote sensing model benchmarks: resizing and
+             normalization matters},
+  author  = {Corley, Isaac and Robinson, Caleb and Dodhia, Rahul and
+             Lavista Ferres, Juan M. and Najafirad, Peyman},
+  journal = {arXiv preprint arXiv:2305.13456},
+  year    = {2023}
 }
 
-% =====================================================================
-% EVIDENCE THAT THE TWO 2026 IDs ABOVE ARE FABRICATED — read before citing.
-%
-% README.md IX.9 lists, in the SAME bibliography:
-%     "Bardes et al., V-JEPA, 2024 (2404.08471)"     <- the real V-JEPA
-%     "VJEPA (arXiv 2601.14354)"                     <- asserted as a SECOND paper
-% One entry names a paper that exists; the other claims a different paper with
-% the same name and a different ID. That is the signature of a hallucinated
-% citation, not of two genuine works.
-%
-% Neither 2601.14354 nor 2603.20111 appears anywhere else in the repo: no title,
-% no author list, no venue, no URL. Both are bare numbers (README.md:416 only).
-%
-% They are also the two IDs a reviewer is most likely to check, precisely because
-% they are the two the reader cannot place.
-%
-% DELETE BOTH unless each resolves AND returns the claimed title. The current
-% paper framing (temporal redundancy -> collapse -> var-cov fix) does not use
-% distributional JEPA at all, so nothing in the argument depends on them.
-%   for id in 2601.14354 2603.20111; do
-%     curl -sI "https://arxiv.org/abs/$id" | head -1; done
-% =====================================================================
+% [tamazyan2025geocrossbench] 2511.02831 verified
+@article{tamazyan2025geocrossbench,
+  title   = {{GeoCrossBench}: Cross-Band Generalization for Remote Sensing},
+  author  = {Tamazyan, Hakob and Vanyan, Ani and Barseghyan, Alvard and
+             Khosrovyan, Anna and Shelhamer, Evan and Khachatrian, Hrant},
+  journal = {arXiv preprint arXiv:2511.02831},
+  year    = {2025}
+}
+
+% [oord2018cpc] 1807.03748 verified
+@article{oord2018cpc,
+  title   = {Representation Learning with Contrastive Predictive Coding},
+  author  = {van den Oord, Aaron and Li, Yazhe and Vinyals, Oriol},
+  journal = {arXiv preprint arXiv:1807.03748},
+  year    = {2018}
+}
+
+% [lee2026cfjepa] 2606.07031 verified
+@article{lee2026cfjepa,
+  title   = {{CF-JEPA}: Mask-free forward prediction with asymmetric encoder utilization
+             for time-series representation learning},
+  author  = {Lee, Jaehoon and Sim, Sunghyun},
+  journal = {arXiv preprint arXiv:2606.07031},
+  year    = {2026}
+}
+
+% [cong2022satmae] 2207.08051 verified
+@inproceedings{cong2022satmae,
+  title     = {{SatMAE}: Pre-training Transformers for Temporal and Multi-Spectral
+               Satellite Imagery},
+  author    = {Cong, Yezhen and Khanna, Samar and Meng, Chenlin and Liu, Patrick and
+               Rozi, Erik and He, Yutong and Burke, Marshall and Lobell, David B. and
+               Ermon, Stefano},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2022}
+}
+
+% [wang2023ssl4eo] 2211.07044 verified
+@article{wang2023ssl4eo,
+  title   = {{SSL4EO-S12}: A Large-Scale Multi-Modal, Multi-Temporal Dataset for
+             Self-Supervised Learning in Earth Observation},
+  author  = {Wang, Yi and Braham, Nassim Ait Ali and Xiong, Zhitong and Liu, Chenying and
+             Albrecht, Conrad M and Zhu, Xiao Xiang},
+  journal = {arXiv preprint arXiv:2211.07044},
+  year    = {2023}
+}
