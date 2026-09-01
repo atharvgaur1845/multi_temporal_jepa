@@ -16,8 +16,8 @@ import torch.nn.functional as F
 
 
 @torch.no_grad()
-def extract_dense_features(encoder, batch, img_size=128, use_temporal=True):
-    """Run the FROZEN encoder, temporally pool, upsample token features to (B, D, H, W).
+def extract_dense_features(encoder, batch, img_size=128, use_temporal=True, train_encoder=False):
+    """Run the encoder (frozen by default), temporally pool, upsample tokens to (B, D, H, W).
 
     use_temporal=True  : spatiotemporal path (encode_temporal) — for methods that trained the
                          temporal encoder (temporal/spatial JEPA).
@@ -25,8 +25,13 @@ def extract_dense_features(encoder, batch, img_size=128, use_temporal=True):
                          for baselines (MAE/BYOL/SimCLR) that train only the spatial encoder, so
                          their untrained temporal encoder doesn't corrupt the probe (fair eval).
     Then reshape to the (H',W') token grid -> bilinear upsample to full resolution.
+
+    train_encoder=True leaves the encoder in whatever mode the caller set and is ONLY for the
+    end-to-end supervised reference; every frozen-probe number in the paper is produced with the
+    default, which forces eval() here so a caller cannot accidentally probe a training-mode encoder.
     """
-    encoder.eval()
+    if not train_encoder:
+        encoder.eval()
     data, dates, pad_mask = batch["data"], batch["dates"], batch["pad_mask"]
     if use_temporal:
         tok = encoder.encode_temporal(data, dates, pad_mask)     # (B, T, N, D)
@@ -68,22 +73,49 @@ def _sanitize_labels(label, num_classes, ignore_index):
                        torch.full_like(label, ignore_index))
 
 
+PROBE_HIDDEN = 256          # hidden width shared by every non-linear probe head
+PROBE_RF = {"linear": 1, "conv": 3, "rf1": 1, "rf3": 3, "rf5": 5, "rf9": 9}
+
+
 def _build_head(D, num_classes, head):
-    """Probe head. 'linear' = 1x1 conv (the strict linear-probe convention). 'conv' = a small
-    2-layer conv decoder (3x3 -> GELU -> 1x1) — a fairer DENSE readout that sharpens the coarse
-    upsampled token features. Report which one you used."""
-    if head == "linear":
+    """Probe head, graded by SPATIAL RECEPTIVE FIELD.
+
+    The capacity axis that matters for the floor comparison is how much spatial mixing the probe
+    can supply for itself. Raw bands carry no spatial context, so a 1x1 probe cannot recover any;
+    a randomly initialised encoder supplies mixing through attention before the probe ever sees
+    the features. Sweeping the receptive field is therefore the direct test of which floor binds.
+
+    Ladder (n stacked 3x3 convs then a 1x1 classifier) gives RF = 2n+1:
+      'linear' / 'rf1'  1x1                      RF 1   the strict linear-probe convention
+      'conv'   / 'rf3'  3x3 -> 1x1               RF 3   the light dense decoder
+      'rf5'             (3x3)x2 -> 1x1           RF 5
+      'rf9'             (3x3)x4 -> 1x1           RF 9
+    'linear' and 'conv' are kept as the canonical names for RF 1 and RF 3, so numbers reported
+    before this sweep existed remain exactly the RF 1 and RF 3 points of the curve.
+    """
+    if head in ("linear", "rf1"):
         return nn.Conv2d(D, num_classes, 1)
-    if head == "conv":
-        return nn.Sequential(nn.Conv2d(D, 256, 3, padding=1), nn.GELU(),
-                             nn.Conv2d(256, num_classes, 1))
+    if head in ("conv", "rf3", "rf5", "rf9"):
+        n_layers = {"conv": 1, "rf3": 1, "rf5": 2, "rf9": 4}[head]
+        layers, c_in = [], D
+        for _ in range(n_layers):
+            layers += [nn.Conv2d(c_in, PROBE_HIDDEN, 3, padding=1), nn.GELU()]
+            c_in = PROBE_HIDDEN
+        layers.append(nn.Conv2d(c_in, num_classes, 1))
+        return nn.Sequential(*layers)
     raise ValueError(f"unknown head {head!r}")
 
 
 def linear_probe_segmentation(encoder, train_loader, val_loader, num_classes=20,
                               ignore_index=19, epochs=20, lr=1e-3, device=None,
-                              use_temporal=True, head="linear", seed=0):
-    """Freeze encoder; train a probe head -> per-pixel logits; report mIoU.
+                              use_temporal=True, head="linear", seed=0, freeze=True):
+    """Train a head on encoder features -> per-pixel logits; report mIoU.
+
+    freeze=True (default) is the frozen probe used for every cell in the paper: the encoder is
+    eval() and its parameters get no gradient. freeze=False trains encoder and head together and
+    exists for one purpose, the end-to-end SUPERVISED REFERENCE, which asks whether the protocol
+    itself is capable of producing a usable segmenter at this budget. It is not a probe and must
+    never be pooled with the frozen cells.
 
     use_temporal selects the feature pathway (see extract_dense_features): True for JEPA,
     False for spatial-only baselines. head: 'linear' (strict probe) or 'conv' (light decoder).
@@ -94,28 +126,35 @@ def linear_probe_segmentation(encoder, train_loader, val_loader, num_classes=20,
     """
     torch.manual_seed(seed)
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    encoder = encoder.to(device).eval()
+    encoder = encoder.to(device)
+    encoder.eval() if freeze else encoder.train()
     for p in encoder.parameters():
-        p.requires_grad_(False)
+        p.requires_grad_(not freeze)
 
     # infer feature dim from one batch
     sample = next(iter(train_loader))
     sample = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in sample.items()}
-    D = extract_dense_features(encoder, sample, use_temporal=use_temporal).shape[1]
+    with torch.no_grad():
+        D = extract_dense_features(encoder, sample, use_temporal=use_temporal).shape[1]
     head = _build_head(D, num_classes, head).to(device)
-    opt = torch.optim.AdamW(head.parameters(), lr=lr)
+    params = list(head.parameters()) + ([] if freeze else list(encoder.parameters()))
+    opt = torch.optim.AdamW(params, lr=lr)
 
     for ep in range(epochs):
         head.train()
+        if not freeze:
+            encoder.train()
         for batch in train_loader:
             batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
-            feat = extract_dense_features(encoder, batch, use_temporal=use_temporal)
+            feat = extract_dense_features(encoder, batch, use_temporal=use_temporal,
+                                          train_encoder=not freeze)
             logits = head(feat)
             label = _sanitize_labels(batch["label"], num_classes, ignore_index)
             loss = F.cross_entropy(logits, label, ignore_index=ignore_index)
             opt.zero_grad(); loss.backward(); opt.step()
 
     head.eval()
+    encoder.eval()
     conf = torch.zeros(num_classes, num_classes, dtype=torch.long)
     with torch.no_grad():
         for batch in val_loader:
