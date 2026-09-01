@@ -14,8 +14,22 @@ free_gb () { df -BG --output=avail "$1" 2>/dev/null | tail -1 | tr -dc '0-9'; }
 fsid () { df --output=source "$1" 2>/dev/null | tail -1 | tr -d ' '; }
 
 say "=== quota ==="
-quota -s 2>/dev/null || say "(no 'quota' command — try 'lfs quota -h -u $USER $HOME' on Lustre)"
-lfs quota -h -u "$USER" "$HOME" 2>/dev/null
+# CRITICAL: df reports the FILESYSTEM, not your personal limit. A Lustre scratch
+# can show 152 TB free and still stop you at 40 GB. Always read the quota, not df.
+got_quota=0
+if command -v lfs >/dev/null; then
+  for m in "$HOME" /scratch "/scratch/$USER" ${SCRATCH:+"$SCRATCH"}; do
+    [[ -d "$m" ]] || continue
+    out=$(lfs quota -h -u "$USER" "$m" 2>/dev/null) && [[ -n "$out" ]] && {
+      say "--- lfs quota on $m ---"; say "$out"; got_quota=1; }
+  done
+fi
+command -v quota >/dev/null && { quota -s 2>/dev/null && got_quota=1; }
+if [[ "$got_quota" -eq 0 ]]; then
+  say "  !! COULD NOT READ ANY QUOTA."
+  say "  !! Do NOT trust the free-space numbers below. Ask your admin for your"
+  say "  !! scratch and home quotas before downloading 29 GB."
+fi
 say ""
 
 HOME_FREE=$(free_gb "$HOME")

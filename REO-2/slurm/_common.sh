@@ -5,8 +5,11 @@ PARTITION_DEFAULT=gpu_a100_8
 # Per-step batch and grad accumulation. THEY MUST MULTIPLY TO 192 --
 # that is the effective batch every committed baseline used. Run
 # 10_fit_batch.sbatch first and set these from its recommendation.
-BATCH=${BATCH:-96}
-ACCUM=${ACCUM:-2}
+# 12 x 16 = 192. This MUST match the multi-seed cells (tjepa_h1, spatial_jepa, floors),
+# not merely the effective batch: SimCLR's negative count and the variance-covariance
+# term are both per-micro-batch, so a different per-step batch is a different experiment.
+BATCH=${BATCH:-12}
+ACCUM=${ACCUM:-16}
 
 # Where the dataset and the run outputs live. Scratch, not home -- PASTIS is
 # 29 GB and needs ~58 GB while extracting.
@@ -25,7 +28,27 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 if [[ -n "$MODULES" ]]; then module load $MODULES; fi
-source .venv/bin/activate
+
+# Activate whichever environment this machine has. On the cluster this is a CLONE of an
+# existing conda env, living on scratch so it never touches the 40 GB HOME quota, and the
+# user's own envs are left unmodified. sbatch runs a non-interactive shell, so the conda
+# profile hook must be sourced first or `conda activate` silently does nothing.
+CONDA_ENV="${CONDA_ENV:-$SCRATCH_ROOT/reo2/envs/tjepa}"
+if [[ -x "$CONDA_ENV/bin/python" ]]; then
+  # conda's activate.d hooks reference unset vars (e.g. MKL_INTERFACE_LAYER), which
+  # `set -u` turns into a fatal error and kills the job before training starts.
+  # Disable nounset across activation only, then restore it.
+  set +u
+  source "$(conda info --base)/etc/profile.d/conda.sh"
+  conda activate "$CONDA_ENV"
+  set -u
+  echo "[env] conda: $CONDA_ENV  python=$(command -v python)"
+elif [[ -f .venv/bin/activate ]]; then
+  source .venv/bin/activate
+  echo "[env] venv: $PWD/.venv"
+else
+  echo "FATAL: no environment found (looked for $CONDA_ENV and .venv)" >&2; exit 1
+fi
 
 if (( BATCH * ACCUM != 192 )); then
   echo "FATAL: BATCH($BATCH) * ACCUM($ACCUM) = $((BATCH*ACCUM)), not 192." >&2

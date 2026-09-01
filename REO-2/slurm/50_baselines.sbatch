@@ -3,9 +3,10 @@
 #SBATCH --partition=gpu_a100_8
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
+#SBATCH --requeue
 #SBATCH --mem=64G
 #SBATCH --time=1-00:00:00
-#SBATCH --array=0-4
+#SBATCH --array=0-2
 #SBATCH --output=REO-2/slurm/logs/%x-%A_%a.out
 #SBATCH --error=REO-2/slurm/logs/%x-%A_%a.err
 #
