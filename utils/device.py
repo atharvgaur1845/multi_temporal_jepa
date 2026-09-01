@@ -20,4 +20,13 @@ def resolve_device(name=None):
     if str(name).startswith("cuda") and not torch.cuda.is_available():
         print(f"[device] {name} requested but CUDA unavailable — falling back to cpu.")
         return torch.device("cpu")
-    return torch.device(name)
+    dev = torch.device(name)
+    # ALWAYS return an INDEXED cuda device. A bare torch.device("cuda") has
+    # index=None, which torch.cuda.set_device() rejects outright:
+    #     ValueError: Expected a torch.device with a specified index ... but got: cuda
+    # and which makes per-device queries (max_memory_allocated) silently read GPU 0.
+    # Under SLURM, --gres=gpu:1 sets CUDA_VISIBLE_DEVICES so the allocated card is
+    # always index 0 — resolving "cuda" -> "cuda:0" is therefore correct there too.
+    if dev.type == "cuda" and dev.index is None:
+        dev = torch.device("cuda", torch.cuda.current_device())
+    return dev

@@ -32,6 +32,12 @@ class GpuHourMeter:
             # reset_peak_memory_stats() errors ("did you call init?") if start() runs before any
             # tensor has been placed on this device (e.g. in run_matrix, before build_model).
             if self._device is not None:
+                # Defensive: a caller may still hand us a bare "cuda" (index None),
+                # which set_device() rejects. Resolve it to the current index.
+                d = torch.device(self._device)
+                if d.type == "cuda" and d.index is None:
+                    d = torch.device("cuda", torch.cuda.current_device())
+                self._device = d
                 torch.cuda.set_device(self._device)
                 torch.zeros(1, device=self._device)  # force context init; negligible memory
             torch.cuda.reset_peak_memory_stats(self._device)
