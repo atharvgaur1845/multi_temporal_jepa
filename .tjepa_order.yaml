@@ -1,0 +1,52 @@
+# 8 GB "good results" config: SAME quality as the server config (patch_size 8, embed 512,
+# predictor 384, 100 epochs, effective batch 192) — only the per-step batch is small so it fits an
+# 8 GB card; grad_accum makes up the effective batch, so model quality is identical, just slower.
+# Measured peak ~3.6 GB at batch 8 (leaves room for the probe + a co-resident process).
+objective: temporal_order
+device: cuda
+
+encoder:
+  patch_size: 8                    # 16x16 = 256 tokens/frame — full resolution
+  embed_dim: 512
+  depth: 6
+  num_heads: 8
+  temporal_depth: 4
+  grad_checkpoint: true
+
+predictor:
+  embed_dim: 384                   # narrower than encoder (512) — asymmetry bottleneck
+  depth: 6
+  num_heads: 12
+
+ema:
+  base_momentum: 0.996
+  final_momentum: 1.0
+  schedule: linear
+
+temporal:
+  horizon: 1
+  min_context: 4
+
+loss:
+  type: l2
+  target_layernorm: true
+  stop_grad: true
+  var_coeff: 1.0
+  cov_coeff: 0.04
+
+optim:
+  name: adamw
+  lr: 1.0e-3
+  warmup_epochs: 15
+  min_lr: 1.0e-6
+  weight_decay_start: 0.04
+  weight_decay_end: 0.40
+  epochs: 100
+  batch_size: 12
+  grad_accum: 16
+  amp: true
+  augment: true
+
+log:
+  diagnostics_every: 50
+  seed: 0
