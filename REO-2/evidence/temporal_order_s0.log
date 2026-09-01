@@ -1,0 +1,27 @@
+[run_matrix] 1 cells total; running 1; skipping 0
+[run_matrix] device = cuda:0  seed = 0
+[run_matrix] probing on val folds [4]
+[temporal_order] opt-step 0 loss 0.6958 acc 0.432
+[temporal_order] epoch 1/100 loss 0.6740 train-acc 0.497
+[temporal_order] epoch 2/100 loss 0.6756 train-acc 0.503
+[temporal_order] epoch 3/100 loss 0.6869 train-acc 0.510
+[temporal_order] epoch 4/100 loss 0.7101 train-acc 0.519
+[temporal_order] epoch 5/100 loss 0.7106 train-acc 0.499
+[temporal_order] epoch 6/100 loss 0.7081 train-acc 0.527
+[temporal_order] opt-step 50 loss 0.6776 acc 0.488
+[temporal_order] epoch 7/100 loss 0.6662 train-acc 0.501
+[temporal_order] epoch 8/100 loss 0.6946 train-acc 0.465
+[temporal_order] epoch 9/100 loss 0.6995 train-acc 0.486
+[temporal_order] epoch 10/100 loss 0.6881 train-acc 0.483
+[temporal_order] epoch 11/100 loss 0.6932 train-acc 0.510
+[temporal_order] epoch 12/100 loss 0.6661 train-acc 0.502
+[temporal_order] epoch 13/100 loss 0.6630 train-acc 0.518
+[temporal_order] opt-step 100 loss 0.7199 acc 0.461
+[temporal_order] epoch 14/100 loss 0.6998 train-acc 0.510
+[temporal_order] epoch 15/100 loss 0.6848 train-acc 0.499
+[temporal_order] epoch 16/100 loss 0.6741 train-acc 0.494
+[temporal_order] epoch 17/100 loss 0.7009 train-acc 0.480
+[temporal_order] epoch 18/100 loss 0.6946 train-acc 0.514
+[temporal_order] epoch 19/100 loss 0.6795 train-acc 0.527
+[temporal_order] opt-step 150 loss 0.6643 acc 0.494
+[temporal_order] epoch 20/100 loss 0.6954 train-acc 0.497

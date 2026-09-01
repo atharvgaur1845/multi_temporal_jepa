@@ -1,0 +1,12 @@
+[sweep] raw_features s1 rf5 (RF5): mIoU 20.23
+[sweep] raw_features s1 rf9 (RF9): mIoU 21.37
+[sweep] raw_features s2 rf5 (RF5): mIoU 20.23
+[sweep] raw_features s2 rf9 (RF9): mIoU 21.37
+[sweep] tjepa_h1 s1 rf5 (RF5): mIoU 20.90
+[sweep] tjepa_h1 s1 rf9 (RF9): mIoU 20.00
+[sweep] tjepa_h1 s2 rf5 (RF5): mIoU 18.61
+[sweep] tjepa_h1 s2 rf9 (RF9): mIoU 18.44
+[sweep] random s1 rf5 (RF5): mIoU 11.56
+[sweep] random s1 rf9 (RF9): mIoU 10.57
+[sweep] random s2 rf5 (RF5): mIoU 12.26
+[sweep] random s2 rf9 (RF9): mIoU 9.94

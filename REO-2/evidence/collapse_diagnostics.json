@@ -1,0 +1,16 @@
+{
+  "VICReg on  (tjepa_h1, seed 0)": {
+    "per_dim_std": 0.948,
+    "effective_rank": 312.38,
+    "offdiag_cov": 0.00248,
+    "dim": 512,
+    "n_tokens": 24576
+  },
+  "VICReg off (tjepa_noreg)": {
+    "per_dim_std": 0.1721,
+    "effective_rank": 1.49,
+    "offdiag_cov": 0.56416,
+    "dim": 512,
+    "n_tokens": 24576
+  }
+}

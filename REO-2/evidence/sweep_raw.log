@@ -1,0 +1,12 @@
+[sweep] raw_features s0 rf1 (RF1): mIoU 4.75
+[sweep] raw_features s0 rf3 (RF3): mIoU 14.52
+[sweep] raw_features s0 rf5 (RF5): mIoU 20.25
+[sweep] raw_features s0 rf9 (RF9): mIoU 21.58
+[sweep] raw_features s1 rf1 (RF1): mIoU 4.69
+[sweep] raw_features s1 rf3 (RF3): mIoU 13.73
+[sweep] raw_features s1 rf5 (RF5): mIoU 20.29
+[sweep] raw_features s1 rf9 (RF9): mIoU 19.58
+[sweep] raw_features s2 rf1 (RF1): mIoU 4.70
+[sweep] raw_features s2 rf3 (RF3): mIoU 13.82
+[sweep] raw_features s2 rf5 (RF5): mIoU 20.48
+[sweep] raw_features s2 rf9 (RF9): mIoU 20.63

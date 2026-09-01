@@ -1,0 +1,5 @@
+[mechanistic] H-mech-2: decode acquisition time from frozen SPATIAL features (val fold). Higher month-acc / lower DOY-MAE = more time info.
+[mechanistic] chance month-acc = 8.3%
+
+  tjepa_h1__s0           month-acc  63.9%   DOY circular MAE  29.9 days   (n_train=4800, n_eval=4800)
+  spatial_jepa__s0       month-acc  47.0%   DOY circular MAE  40.8 days   (n_train=4800, n_eval=4800)
