@@ -112,14 +112,33 @@ class PASTIS(Dataset):
 
     def __getitem__(self, idx):
         pid, raw_dates = self.samples[idx]
-        s2 = np.load(os.path.join(self.root, "DATA_S2", f"S2_{pid}.npy"))  # (T, 10, 128, 128)
-        data = torch.from_numpy(s2.astype(np.float32))
+        path = os.path.join(self.root, "DATA_S2", f"S2_{pid}.npy")
         dates = torch.tensor([_yyyymmdd_to_doy(d) for d in raw_dates], dtype=torch.long)
 
-        if self.max_seq_len is not None and data.shape[0] > self.max_seq_len:
-            from .transforms import temporal_subsample
-            data, dates = temporal_subsample(data, dates, self.max_seq_len,
-                                             train=self.subsample_train)
+        if os.environ.get("TJEPA_MMAP", "0") == "1":
+            # Memory-lean path: memory-map the (T,10,128,128) int16 array, pick the frames we
+            # will actually keep, and only THEN materialize float32. The default path below
+            # loads all T frames and float32-casts all of them before discarding most, costing
+            # ~42 MB per sample against ~31 MB here (T=43, max_seq_len=32).
+            # Frame selection is identical -- same indices, same RNG draw, same order -- so the
+            # returned tensor is bit-for-bit what the default path returns.
+            s2 = np.load(path, mmap_mode="r")                       # no full read
+            T = s2.shape[0]
+            if self.max_seq_len is not None and T > self.max_seq_len:
+                from .transforms import temporal_subsample_indices
+                idx_t = temporal_subsample_indices(T, self.max_seq_len, train=self.subsample_train)
+                s2 = np.ascontiguousarray(s2[idx_t.numpy()])
+                dates = dates[idx_t]
+            else:
+                s2 = np.ascontiguousarray(s2)
+            data = torch.from_numpy(s2.astype(np.float32))
+        else:
+            s2 = np.load(path)                                       # (T, 10, 128, 128)
+            data = torch.from_numpy(s2.astype(np.float32))
+            if self.max_seq_len is not None and data.shape[0] > self.max_seq_len:
+                from .transforms import temporal_subsample
+                data, dates = temporal_subsample(data, dates, self.max_seq_len,
+                                                 train=self.subsample_train)
 
         if self.norm_mean is not None and self.norm_std is not None:
             mean = self.norm_mean.view(1, -1, 1, 1)

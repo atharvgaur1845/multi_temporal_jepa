@@ -47,6 +47,21 @@ def normalize_bands(data, mean, std):
     return (data - mean) / std.clamp_min(1e-6)
 
 
+def temporal_subsample_indices(T, max_len, train=False, generator=None):
+    """The index selection used by `temporal_subsample`, factored out so callers that hold a
+    memory-mapped array can pick frames BEFORE materializing them (see PASTIS.__getitem__).
+
+    Consumes the RNG exactly as `temporal_subsample` does, so both paths agree given the same
+    seed state. Returns a LongTensor of sorted indices, length min(T, max_len).
+    """
+    if T <= max_len:
+        return torch.arange(T)
+    if train:
+        perm = torch.randperm(T, generator=generator)[:max_len]
+        return torch.sort(perm).values
+    return torch.linspace(0, T - 1, steps=max_len).round().long()
+
+
 def temporal_subsample(data, dates, max_len, train=False, generator=None):
     """Optionally subsample/truncate a long series to `max_len` acquisitions.
 
