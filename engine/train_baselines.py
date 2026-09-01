@@ -16,6 +16,8 @@ from models.jepa import SITSEncoder
 from objectives.baselines.byol import byol_loss, mlp_head
 from objectives.baselines.mae import MAEModel
 from objectives.baselines.simclr import nt_xent_loss, projector
+from objectives.baselines.temporal_order import (make_order_batch, order_head,
+                                                 pool_spatiotemporal)
 
 
 def _new_backbone(cfg, device):
@@ -171,4 +173,47 @@ def train_mae(loader, cfg, device, logger=print):
     return backbone
 
 
-TRAINERS = {"mae": train_mae, "byol": train_byol, "simclr": train_simclr}
+def train_temporal_order(loader, cfg, device, logger=print):
+    """Temporal-order verification: the non-predictive temporal control.
+
+    Unlike MAE/BYOL/SimCLR this trains the FULL temporal pathway (encode_temporal), because it
+    is the control for temporal JEPA rather than for the spatial baselines. It is therefore
+    probed with use_temporal=True, exactly like the JEPA cells, so the only thing that differs
+    from temporal JEPA is the objective.
+
+    Frames are permuted but dates are NOT (see objectives/baselines/temporal_order), so the task
+    cannot be solved by reading the day-of-year encoding.
+    """
+    D = cfg["encoder"]["embed_dim"]
+    backbone = _new_backbone(cfg, device)
+    head = order_head(D).to(device)
+    opt = _opt(list(backbone.parameters()) + list(head.parameters()), cfg)
+    epochs = cfg["optim"]["epochs"]
+    ga = max(1, cfg["optim"].get("grad_accum", 1))
+    ce = torch.nn.CrossEntropyLoss()
+    opt.zero_grad(set_to_none=True)
+    micro = ostep = 0
+    for ep in range(epochs):
+        seen = correct = 0
+        for batch in loader:
+            batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
+            data, label = make_order_batch(batch)
+            tok = backbone.encode_temporal(data, batch["dates"], batch["pad_mask"])
+            logits = head(pool_spatiotemporal(tok, batch["pad_mask"]))
+            loss = ce(logits, label)
+            (loss / ga).backward()
+            correct += int((logits.argmax(-1) == label).sum().item()); seen += label.numel()
+            micro += 1
+            if micro % ga == 0:
+                opt.step(); opt.zero_grad(set_to_none=True)
+                if ostep % cfg["log"].get("diagnostics_every", 50) == 0:
+                    logger(f"[temporal_order] opt-step {ostep} loss {loss.item():.4f} "
+                           f"acc {correct / max(1, seen):.3f}")
+                ostep += 1
+        logger(f"[temporal_order] epoch {ep + 1}/{epochs} loss {loss.item():.4f} "
+               f"train-acc {correct / max(1, seen):.3f}")
+    return backbone
+
+
+TRAINERS = {"mae": train_mae, "byol": train_byol, "simclr": train_simclr,
+            "temporal_order": train_temporal_order}
