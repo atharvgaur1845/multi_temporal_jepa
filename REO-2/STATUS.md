@@ -1,5 +1,9 @@
 # STATUS — what this checkout can actually substantiate
 
+> **2026-08-26: P0 HAS LANDED.** The floors exist now and the pre-registered rule's floor
+> conditions both PASS. See **`RESULTS.md`** for the numbers and what they oblige us to rewrite.
+> The audit below describes the state *before* that run; the "floors never run" row is now closed.
+
 Audit date: 2026-08-25. Source of truth: files committed in this repo, nothing else.
 Written before any REO-2 text, because the run priorities depend on it.
 

@@ -79,3 +79,29 @@ grep -rn "atharv\|github.com" main.tex references.bib   # must return nothing
 
 `\PENDING{}` renders in red and is impossible to miss in the compiled PDF — that is the point. Every
 one must be replaced by a number from a committed CSV or by a deleted claim.
+
+---
+
+## The footer is correct. Do not "fix" it. (settled 2026-08-29)
+
+Reviewers have twice flagged that the PDF footer reads *"Submitted to 40th Conference on Neural
+Information Processing Systems (NeurIPS 2026). Do not distribute."* and concluded the workshop
+options were not applied. They are applied. This is submission-mode behaviour of the official style.
+
+Controlled test, same file compiled twice against the shipped `neurips_2026.sty`:
+
+| options | footer |
+|---|---|
+| `[final,dblblindworkshop]` | `40th Conference on ... (NeurIPS 2026). Workshop: 2nd Workshop on Advances in Representation Learning for Earth Observation.` |
+| `[dblblindworkshop]` | `Submitted to 40th Conference ... Do not distribute.` |
+
+Mechanism: `neurips_2026.sty` defines `\@trackname` (which carries `\@workshoptitle`) in the
+`dblblindworkshop` option handler at line 90, but `\@trackname` is only ever *consumed* inside
+`\if@neuripsfinal` at line 398. The submission branch prints the fixed "Submitted to..." string
+regardless of track. Every REO-2 submission built from this style looks identical.
+
+Adding `final` to make the workshop name appear would produce a **camera-ready** build: it removes
+the line numbers reviewers reference and un-hides `\ack`. That is the wrong artefact to upload.
+
+**Action: none.** If an organiser insists, the answer is that the workshop name appears on the
+camera-ready.
