@@ -63,6 +63,31 @@ def _augment_flips(batch):
     return batch
 
 
+def _shuffle_time(batch):
+    """Non-predictive temporal control: permute image frames, leave `dates` chronological.
+
+    Separates "predicting the real future helps" from "having a temporal axis helps". The model
+    still receives the same number of acquisitions, the same temporal attention and the same
+    day-of-year encoding in the same order; only the correspondence between an image and its date
+    is destroyed, so the future latent it is asked to predict is no longer the actual future.
+
+    The permutation is drawn over each sample's REAL frames only, leaving padding at the tail
+    where the pad_mask says it is (Common Mistake #8) -- permuting across the pad boundary would
+    move padding into the middle of the series and change what the mask means.
+    """
+    data, pad_mask = batch["data"], batch["pad_mask"]
+    out = data.clone()
+    for b in range(data.shape[0]):
+        n = int(pad_mask[b].sum())
+        if n < 2:
+            continue
+        perm = torch.randperm(n).to(data.device)
+        out[b, :n] = data[b, perm]
+    batch = dict(batch)
+    batch["data"] = out
+    return batch
+
+
 def train_one_epoch(model, loader, optimizer, scaler, cfg, step0, total_steps, device,
                     logger=print):
     """Run one epoch. Returns the updated global step."""
@@ -77,11 +102,14 @@ def train_one_epoch(model, loader, optimizer, scaler, cfg, step0, total_steps, d
     wd_start = optim_cfg.get("weight_decay_start", 0.04)
     wd_end = optim_cfg.get("weight_decay_end", wd_start)
     augment = optim_cfg.get("augment", True)
+    shuffle_time = optim_cfg.get("shuffle_time", False)
 
     step = step0
     optimizer.zero_grad(set_to_none=True)
     for it, batch in enumerate(loader):
         batch = _to_device(batch, device)
+        if shuffle_time:
+            batch = _shuffle_time(batch)
         if augment:
             batch = _augment_flips(batch)
 
@@ -138,7 +166,8 @@ def main(config_path, data_config_path, device=None):
         mean, std = compute_band_stats(train, max_samples=200)
         train.norm_mean, train.norm_std = mean, std
     loader = DataLoader(train, batch_size=cfg["optim"]["batch_size"], shuffle=True,
-                        num_workers=8, collate_fn=collate_variable_length, drop_last=True,
+                        num_workers=int(os.environ.get("TJEPA_WORKERS", "8")),
+                        collate_fn=collate_variable_length, drop_last=True,
                         pin_memory=True)
 
     # model + optim
