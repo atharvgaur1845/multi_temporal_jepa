@@ -42,6 +42,15 @@ def enumerate_cells():
     #   random : identical architecture, NEVER trained -> isolates the objective from the inductive
     #            bias of the temporal-attention architecture itself.
     #   raw    : patch-mean raw bands, no encoder -> the true no-representation floor.
+    # Non-predictive temporal control: uses the time axis, predicts nothing. Separates
+    # "predicting future latents helps" from "using the temporal axis helps".
+    cells.append(("temporal_order", {"objective": "temporal_order"}))
+    # Shuffled-time control: SAME architecture and objective as tjepa_h1, but image frames are
+    # permuted while dates stay chronological, so "predict the future latent" predicts a random
+    # frame. Unlike temporal_order this shares the headline cell's encoder and pooling exactly,
+    # so a drop cannot be blamed on a different readout path.
+    cells.append(("tjepa_shuffle", {"objective": "temporal_jepa", "temporal": {"horizon": 1},
+                                    "optim": {"shuffle_time": True}}))
     cells.append(("random", {"objective": "random"}))
     cells.append(("raw_features", {"objective": "raw"}))
     # Part 6 #8 Graph Temporal JEPA: grid-graph GNN spatial backbone instead of the spatial ViT.
@@ -105,6 +114,11 @@ def main():
                     help="comma-separated cell names to run (e.g. 'tjepa_graph'); others are skipped. "
                          "Lets you add ONE new cell against the SAME base config as the existing "
                          "baselines without re-running or contaminating them.")
+    ap.add_argument("--ckpt-every", type=int, default=1,
+                    help="save a rotating mid-training checkpoint every N epochs (0 = off). "
+                         "Only the LATEST is kept: the write is atomic (tmp + rename), so the "
+                         "previous one is replaced, never accumulated. Lets --resume continue a "
+                         "cell that crashed mid-training instead of restarting it.")
     ap.add_argument("--seed", type=int, default=None,
                     help="override training seed (for multi-seed error bars; tags outputs)")
     ap.add_argument("--cv-fold", type=int, default=None, choices=[1, 2, 3, 4, 5],
@@ -179,7 +193,13 @@ def main():
     probe_tr = PASTIS(data_cfg["root"], folds=data_cfg["train_folds"], return_label=True,
                       norm_mean=mean, norm_std=std, max_seq_len=msl)
 
-    resume_existing = args.resume and os.path.exists(out_path)
+    # Append only to a file that actually HAS a header. A crashed run can leave a zero-byte
+    # (or header-only-less) CSV behind; appending to that silently produces a headerless file,
+    # and csv.DictReader then eats the first DATA row as the header -- the whole seed vanishes
+    # from the aggregate without any error. That is exactly what happened to seed 1.
+    resume_existing = (args.resume and os.path.exists(out_path)
+                       and os.path.getsize(out_path) > 0
+                       and open(out_path).readline().startswith("cell,"))
     with open(out_path, "a" if resume_existing else "w", newline="") as f:
         writer = csv.writer(f)
         if not resume_existing:
@@ -201,8 +221,14 @@ def main():
                 print(f"[run_matrix] {name}: embed>=768 -> batch {cfg['optim']['batch_size']}, "
                       f"accum {cfg['optim']['grad_accum']} (memory safety)")
             seed_everything(cfg["log"].get("seed", 0))
+            _nw = int(os.environ.get("TJEPA_WORKERS", "8"))
+            # prefetch_factor multiplies host RAM: workers x prefetch batches are in flight at
+            # once, and a PASTIS batch is ~42 MB/sample. On a 15 GB laptop that is the difference
+            # between running and being OOM-killed. Only valid when num_workers > 0.
+            _dl_kw = {"prefetch_factor": int(os.environ.get("TJEPA_PREFETCH", "2"))} if _nw else {}
             loader = DataLoader(train, batch_size=cfg["optim"]["batch_size"], shuffle=True,
-                                num_workers=8, collate_fn=collate_variable_length, drop_last=True)
+                                num_workers=_nw, collate_fn=collate_variable_length,
+                                drop_last=True, **_dl_kw)
             meter = GpuHourMeter(device); meter.start()
 
             if obj == "raw":
@@ -212,8 +238,15 @@ def main():
                                           in_chans=data_cfg.get("bands", 10)).to(device)
                 use_temporal = False
             elif obj == "random":
-                # identical architecture to tjepa_h1, weights NEVER updated -> the untrained control
-                m = build_model(cfg).to(device)
+                # Identical architecture to tjepa_h1, weights NEVER updated -> the untrained
+                # control that isolates the OBJECTIVE from the inductive bias of the
+                # temporal-attention architecture itself.
+                # build_model asserts objective in {spatial_jepa, temporal_jepa}, so the cell's
+                # own name ("random") cannot be passed through -- swap in temporal_jepa to get
+                # exactly the tjepa_h1 architecture, then simply never train it.
+                rcfg = copy.deepcopy(cfg)
+                rcfg["objective"] = "temporal_jepa"
+                m = build_model(rcfg).to(device)
                 encoder, use_temporal = m.target_encoder, True
                 del m
             elif obj in ("temporal_jepa", "spatial_jepa"):
@@ -223,14 +256,41 @@ def main():
                 scaler = torch.amp.GradScaler(device.type, enabled=cfg["optim"].get("amp", True))
                 total = cfg["optim"]["epochs"] * len(loader)
                 step = 0
-                for _ in range(cfg["optim"]["epochs"]):
+                start_epoch = 0
+                # Rotating mid-training checkpoint. ONE file per cell: each save atomically
+                # replaces the previous, so disk holds the latest and nothing else.
+                train_ckpt = os.path.join(args.ckpt_dir, f"{name}{tag}.train.pt")
+                if args.resume and os.path.exists(train_ckpt):
+                    st = torch.load(train_ckpt, map_location=device, weights_only=False)
+                    model.load_state_dict(st["model"])
+                    opt.load_state_dict(st["opt"])
+                    scaler.load_state_dict(st["scaler"])
+                    start_epoch, step = st["epoch"], st["step"]
+                    print(f"[run_matrix] {name}: resuming from epoch {start_epoch}/"
+                          f"{cfg['optim']['epochs']} (step {step})")
+                for ep in range(start_epoch, cfg["optim"]["epochs"]):
                     step = train_one_epoch(model, loader, opt, scaler, cfg, step, total, device)
+                    if args.ckpt_every and (ep + 1) % args.ckpt_every == 0:
+                        os.makedirs(args.ckpt_dir, exist_ok=True)
+                        tmp = train_ckpt + ".tmp"
+                        torch.save({"model": model.state_dict(), "opt": opt.state_dict(),
+                                    "scaler": scaler.state_dict(), "epoch": ep + 1, "step": step,
+                                    "cfg": cfg, "objective": obj}, tmp)
+                        os.replace(tmp, train_ckpt)   # atomic: old file gone, new one in place
+                        print(f"[run_matrix] {name}: checkpoint @ epoch {ep+1} (step {step})",
+                              flush=True)
                 # keep only the encoder we probe; free the JEPA wrapper + optimizer states so the
                 # probe runs at max(train, probe) memory, not train + probe.
                 model.context_encoder = None
                 model.predictor = None
                 encoder, use_temporal = model.target_encoder, True
                 del model, opt, scaler
+            elif obj == "temporal_order":
+                # Trains the full temporal pathway, so it is probed like the JEPA cells
+                # (use_temporal=True). Probing it spatial-only would compare it to the wrong
+                # group and understate it.
+                encoder = TRAINERS[obj](loader, cfg, device)
+                use_temporal = True
             else:  # mae / byol / simclr — spatial-only backbone, probed without temporal encoder
                 encoder = TRAINERS[obj](loader, cfg, device)
                 use_temporal = False
@@ -257,16 +317,31 @@ def main():
                 Xev, yev = parcel_embeddings(encoder, el, device=device)
                 knn_acc = round(knn_accuracy(Xtr, ytr, Xev, yev, k=20), 4)
 
-            writer.writerow([name, obj, seed, fold if fold else "", eval_split,
-                             round(mious["linear"], 4), round(mious["conv"], 4), knn_acc,
-                             round(stats["gpu_hours"], 3), round(stats["peak_mem_gb"], 2)])
-            f.flush()
+            # Several cells at the SAME seed may run as concurrent jobs, all appending to
+            # this one file. Without a lock their writes interleave and truncate each
+            # other's rows -- that happened, and results had to be recovered from logs.
+            # flock serialises the append; the row is small so contention is negligible.
+            import fcntl
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            try:
+                f.seek(0, os.SEEK_END)
+                writer.writerow([name, obj, seed, fold if fold else "", eval_split,
+                                 round(mious["linear"], 4), round(mious["conv"], 4), knn_acc,
+                                 round(stats["gpu_hours"], 3), round(stats["peak_mem_gb"], 2)])
+                f.flush()
+                os.fsync(f.fileno())
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
             # save encoder LAST so its presence means the cell is FULLY done (train+probe+logged)
             # -> --resume can safely skip it on a re-run after a crash/OOM.
             os.makedirs(args.ckpt_dir, exist_ok=True)
             torch.save({"encoder": encoder.state_dict(), "cfg": cfg, "objective": obj,
                         "use_temporal": use_temporal, "seed": seed, "cv_fold": fold},
                        os.path.join(args.ckpt_dir, f"{name}{tag}.pt"))
+            # cell is complete; the mid-training checkpoint is now dead weight (~0.7 GB)
+            _tc = os.path.join(args.ckpt_dir, f"{name}{tag}.train.pt")
+            if os.path.exists(_tc):
+                os.remove(_tc)
             print(f"[run_matrix] {name}: linear={mious['linear']*100:.2f} conv={mious['conv']*100:.2f} "
                   f"knn={knn_acc} gpu_h={stats['gpu_hours']:.2f}")
 
